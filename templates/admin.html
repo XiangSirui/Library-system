@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台 · 阅享空间</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body class="admin-page">
+  <aside class="admin-sidebar">
+    <div class="sidebar-brand">
+      <span>📚</span>
+      <div>
+        <strong>阅享空间</strong>
+        <small>管理后台</small>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="sidebar-link active" data-panel="dashboard">概览</button>
+      <button class="sidebar-link" data-panel="books">图书管理</button>
+      <button class="sidebar-link" data-panel="borrows">借阅记录</button>
+      <button class="sidebar-link" data-panel="rooms">活动室预约</button>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/" class="sidebar-link muted">← 返回前台</a>
+      <button class="sidebar-link muted" id="logoutBtn">退出登录</button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <header class="admin-header">
+      <h1 id="panelTitle">数据概览</h1>
+      <span class="admin-user" id="adminUserName">管理员</span>
+    </header>
+
+    <!-- 概览 -->
+    <section class="admin-panel active" id="panel-dashboard">
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="admin-card">
+        <h2>热门借阅 TOP 5</h2>
+        <div id="popularBooks" class="popular-list"></div>
+      </div>
+    </section>
+
+    <!-- 图书管理 -->
+    <section class="admin-panel" id="panel-books">
+      <div class="panel-toolbar">
+        <input type="search" id="bookSearch" placeholder="搜索书名、作者…" class="admin-search">
+        <button class="btn btn-primary" id="addBookBtn">+ 添加图书</button>
+      </div>
+      <div class="admin-card table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>书名</th>
+              <th>作者</th>
+              <th>分类</th>
+              <th>总册数</th>
+              <th>借出</th>
+              <th>可借</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="booksTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 借阅记录 -->
+    <section class="admin-panel" id="panel-borrows">
+      <div class="panel-toolbar">
+        <div class="filter-tabs" id="borrowFilters">
+          <button class="filter-tab active" data-status="all">全部</button>
+          <button class="filter-tab" data-status="active">借阅中</button>
+          <button class="filter-tab" data-status="overdue">已逾期</button>
+          <button class="filter-tab" data-status="returned">已归还</button>
+        </div>
+        <input type="search" id="borrowSearch" placeholder="搜索书名、读者、手机号…" class="admin-search">
+      </div>
+      <div class="admin-card table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>借阅码</th>
+              <th>图书</th>
+              <th>读者</th>
+              <th>手机号</th>
+              <th>借阅日</th>
+              <th>应还日</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="borrowsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 活动室预约 -->
+    <section class="admin-panel" id="panel-rooms">
+      <div class="admin-card admin-room-calendar-card">
+        <div class="admin-room-cal-header">
+          <h2>活动室占用一览</h2>
+          <p>未来 14 天内 · 深色为已预约 · 点击格子查看详情</p>
+        </div>
+        <div class="room-calendar-legend admin-legend">
+          <span class="room-legend-item"><span class="room-legend-dot free"></span>空闲</span>
+          <span class="room-legend-item"><span class="room-legend-dot booked"></span>已预约</span>
+          <span class="room-legend-item"><span class="room-legend-dot past"></span>已过期</span>
+        </div>
+        <div class="admin-schedule-wrap" id="adminRoomSchedule"></div>
+        <div class="admin-schedule-tip hidden" id="adminScheduleTip"></div>
+      </div>
+      <div class="panel-toolbar">
+        <div class="filter-tabs" id="roomFilters">
+          <button class="filter-tab active" data-status="all">全部</button>
+          <button class="filter-tab" data-status="upcoming">有效预约</button>
+          <button class="filter-tab" data-status="cancelled">已取消</button>
+          <button class="filter-tab" data-status="past">已完成</button>
+        </div>
+        <input type="search" id="roomSearch" placeholder="搜索用途、联系人…" class="admin-search">
+      </div>
+      <div class="admin-card table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>预约码</th>
+              <th>日期</th>
+              <th>时段</th>
+              <th>用途</th>
+              <th>联系人</th>
+              <th>人数</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="roomsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- 图书编辑弹窗 -->
+  <div class="modal-overlay" id="bookModal">
+    <div class="modal admin-modal">
+      <button class="modal-close" data-close="bookModal">×</button>
+      <h2 id="bookModalTitle">添加图书</h2>
+      <form id="bookForm" class="admin-form">
+        <input type="hidden" id="editBookId">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="bookTitle">书名 *</label>
+            <input type="text" id="bookTitle" required>
+          </div>
+          <div class="form-group">
+            <label for="bookAuthor">作者 *</label>
+            <input type="text" id="bookAuthor" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="bookCategory">分类 *</label>
+            <select id="bookCategory" required>
+              <option value="文学">文学</option>
+              <option value="历史">历史</option>
+              <option value="科幻">科幻</option>
+              <option value="少儿">少儿</option>
+              <option value="社科">社科</option>
+              <option value="艺术">艺术</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="bookCopies">册数 *</label>
+            <input type="number" id="bookCopies" min="1" value="1" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="bookIsbn">ISBN</label>
+          <input type="text" id="bookIsbn" placeholder="978-7-xxxx-xxxx-x">
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" data-close="bookModal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <script src="/static/js/admin.js"></script>
+</body>
+</html>

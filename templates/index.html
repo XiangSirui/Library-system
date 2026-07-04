@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>阅享空间 · 社区共享图书馆</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Serif+SC:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/static/css/style.css">
+
+</head>
+
+<body>
+
+  <div class="grain-overlay" aria-hidden="true"></div>
+
+
+
+  <header class="header" id="header">
+
+    <nav class="nav container">
+
+      <a href="#" class="logo">
+
+        <span class="logo-icon">
+
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+            <path d="M6 8h8v20H6V8z" stroke="currentColor" stroke-width="1.5"/>
+
+            <path d="M14 6h8v22h-8V6z" stroke="currentColor" stroke-width="1.5"/>
+
+            <path d="M22 10h4v18h-4V10z" stroke="currentColor" stroke-width="1.5"/>
+
+            <line x1="8" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1"/>
+
+            <line x1="16" y1="10" x2="20" y2="10" stroke="currentColor" stroke-width="1"/>
+
+          </svg>
+
+        </span>
+
+        <span class="logo-text">阅享空间</span>
+
+      </a>
+
+      <ul class="nav-links">
+
+        <li><a href="#books" class="nav-link">图书借阅</a></li>
+
+        <li><a href="#activity-room" class="nav-link">活动室预约</a></li>
+
+        <li><a href="#my-records" class="nav-link">我的记录</a></li>
+
+      </ul>
+
+      <button class="btn btn-primary nav-cta" id="quickBorrowBtn">借阅图书</button>
+
+      <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
+
+        <span></span><span></span><span></span>
+
+      </button>
+
+    </nav>
+
+  </header>
+
+
+
+  <div class="mobile-menu" id="mobileMenu">
+
+    <a href="#books" class="mobile-link">图书借阅</a>
+
+    <a href="#activity-room" class="mobile-link">活动室预约</a>
+
+    <a href="#my-records" class="mobile-link">我的记录</a>
+
+    <button class="btn btn-primary" id="mobileQuickBorrow">借阅图书</button>
+
+  </div>
+
+
+
+  <section class="hero">
+
+    <div class="hero-bg">
+
+      <div class="hero-photo" aria-hidden="true">
+
+        <img src="/static/images/house.png" alt="">
+
+      </div>
+
+      <div class="hero-gradient"></div>
+
+      <div class="hero-pattern"></div>
+
+    </div>
+
+    <div class="container hero-content">
+
+      <div class="hero-panel">
+
+        <div class="hero-badge">
+
+          <span class="badge-dot"></span>
+
+          社区共享 · 免费借阅
+
+        </div>
+
+        <h1 class="hero-title">
+
+          借一本书<br>
+
+          <em>开启阅读之旅</em>
+
+        </h1>
+
+        <p class="hero-desc">
+
+          阅享空间是面向社区居民的共享图书馆，馆藏图书免费开放借阅。
+
+          同时提供一间社区共享活动室，供读书分享、小型聚会等活动预约使用。
+
+        </p>
+
+        <div class="hero-actions">
+
+          <button class="btn btn-primary btn-lg" id="heroBorrowBtn">
+
+            浏览馆藏
+
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+
+          </button>
+
+          <a href="#activity-room" class="btn btn-ghost btn-lg">预约活动室</a>
+
+        </div>
+
+        <div class="hero-stats">
+
+          <div class="stat">
+
+            <span class="stat-num" id="heroBookCount">—</span>
+
+            <span class="stat-label">馆藏图书</span>
+
+          </div>
+
+          <div class="stat-divider"></div>
+
+          <div class="stat">
+
+            <span class="stat-num">30 天</span>
+
+            <span class="stat-label">借阅期限</span>
+
+          </div>
+
+          <div class="stat-divider"></div>
+
+          <div class="stat">
+
+            <span class="stat-num">1 间</span>
+
+            <span class="stat-label">共享活动室</span>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="hero-visual">
+
+      <div class="hero-book-stack">
+
+        <div class="stack-book stack-book-1"></div>
+
+        <div class="stack-book stack-book-2"></div>
+
+        <div class="stack-book stack-book-3"></div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+
+
+  <section class="section books-section" id="books">
+
+    <div class="container">
+
+      <div class="section-header">
+
+        <span class="section-tag">Library</span>
+
+        <h2 class="section-title">图书借阅</h2>
+
+        <p class="section-desc">浏览馆藏，在线预约借阅，到馆取书即可</p>
+
+      </div>
+
+
+
+      <div class="search-bar">
+
+        <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+
+          <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/>
+
+          <path d="M14 14l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+
+        </svg>
+
+        <input type="search" id="bookSearch" placeholder="搜索书名、作者…" autocomplete="off">
+
+      </div>
+
+
+
+      <div class="filter-bar">
+
+        <button class="filter-btn active" data-book-filter="all">全部</button>
+
+        <button class="filter-btn" data-book-filter="文学">文学</button>
+
+        <button class="filter-btn" data-book-filter="历史">历史</button>
+
+        <button class="filter-btn" data-book-filter="科幻">科幻</button>
+
+        <button class="filter-btn" data-book-filter="少儿">少儿</button>
+
+        <button class="filter-btn" data-book-filter="社科">社科</button>
+
+        <button class="filter-btn" data-book-filter="艺术">艺术</button>
+
+      </div>
+
+
+
+      <div class="books-grid" id="booksGrid"></div>
+
+      <div class="empty-state hidden" id="emptyBooks">
+
+        <div class="empty-icon">🔍</div>
+
+        <h3>未找到相关图书</h3>
+
+        <p>试试其他关键词或分类</p>
+
+      </div>
+
+    </div>
+
+  </section>
+
+
+
+  <section class="section room-section" id="activity-room">
+
+    <div class="container">
+
+      <div class="section-header">
+
+        <span class="section-tag">Activity Room</span>
+
+        <h2 class="section-title">社区共享活动室</h2>
+
+        <p class="section-desc">本馆仅设一间共享活动室，在线预约仅开放<strong>未来 14 天（两周）</strong>内的时段</p>
+
+      </div>
+
+
+
+      <div class="room-showcase" id="roomShowcase"></div>
+
+    </div>
+
+  </section>
+
+
+
+  <section class="section how-section" id="how-it-works">
+
+    <div class="container">
+
+      <div class="section-header center">
+
+        <span class="section-tag">Guide</span>
+
+        <h2 class="section-title">使用指南</h2>
+
+      </div>
+
+      <div class="guide-grid">
+
+        <div class="guide-block">
+
+          <h3>📚 图书借阅</h3>
+
+          <div class="steps-grid compact">
+
+            <div class="step-card">
+
+              <div class="step-num">01</div>
+
+              <h4>选书预约</h4>
+
+              <p>在线选择图书并提交借阅申请</p>
+
+            </div>
+
+            <div class="step-card">
+
+              <div class="step-num">02</div>
+
+              <h4>到馆取书</h4>
+
+              <p>凭借阅码在前台领取，期限 30 天</p>
+
+            </div>
+
+            <div class="step-card">
+
+              <div class="step-num">03</div>
+
+              <h4>按时归还</h4>
+
+              <p>到期前归还，可在线续借一次</p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="guide-block">
+
+          <h3>🏠 活动室预约</h3>
+
+          <div class="rules-card light">
+
+            <ul>
+
+              <li>仅可预约<strong>未来 14 天（两周）内</strong>的活动室时段</li>
+
+              <li>每位居民每日最多预约 1 次，每次最长 3 小时</li>
+
+              <li>活动人数不超过 30 人，请提前 15 分钟到场签到</li>
+
+              <li>使用后请恢复场地整洁，爱护公共设施</li>
+
+              <li>取消预约请至少在开始前 1 小时操作</li>
+
+            </ul>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+
+
+  <section class="section records-section" id="my-records">
+
+    <div class="container">
+
+      <div class="section-header">
+
+        <span class="section-tag">My Records</span>
+
+        <h2 class="section-title">我的记录</h2>
+
+        <p class="section-desc">管理借阅与活动室预约（按手机号识别）</p>
+
+      </div>
+
+
+
+      <div class="records-phone-bar" id="recordsPhoneBar">
+
+        <label for="recordsPhone">查看记录的手机号</label>
+
+        <input type="tel" id="recordsPhone" placeholder="输入 11 位手机号" pattern="[0-9]{11}">
+
+        <button type="button" class="btn btn-outline btn-sm" id="recordsPhoneBtn">查询</button>
+
+      </div>
+
+
+
+      <div class="records-tabs">
+
+        <button class="tab-btn active" data-record-tab="borrows">我的借阅</button>
+
+        <button class="tab-btn" data-record-tab="room">活动室预约</button>
+
+      </div>
+
+
+
+      <div class="records-panel" id="borrowsPanel">
+
+        <div class="sub-tabs">
+
+          <button class="sub-tab active" data-borrow-tab="active">借阅中</button>
+
+          <button class="sub-tab" data-borrow-tab="history">历史记录</button>
+
+        </div>
+
+        <div class="records-list" id="borrowsList"></div>
+
+        <div class="empty-state hidden" id="emptyBorrows">
+
+          <div class="empty-icon">📚</div>
+
+          <h3>暂无借阅记录</h3>
+
+          <p>去馆藏选一本心仪的书吧</p>
+
+          <button class="btn btn-primary" id="emptyBorrowBtn">去借阅</button>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="records-panel hidden" id="roomPanel">
+
+        <div class="sub-tabs">
+
+          <button class="sub-tab active" data-room-tab="upcoming">即将到来</button>
+
+          <button class="sub-tab" data-room-tab="past">历史记录</button>
+
+        </div>
+
+        <div class="records-list" id="roomBookingsList"></div>
+
+        <div class="empty-state hidden" id="emptyRoomBookings">
+
+          <div class="empty-icon">🏠</div>
+
+          <h3>暂无活动室预约</h3>
+
+          <p>预约共享活动室，举办您的社区活动</p>
+
+          <button class="btn btn-primary" id="emptyRoomBtn">去预约</button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+
+
+  <footer class="footer">
+
+    <div class="container footer-inner">
+
+      <div class="footer-brand">
+
+        <span class="logo-text">阅享空间</span>
+
+        <p>社区共享图书馆 · 图书借阅与活动室预约</p>
+
+      </div>
+
+      <div class="footer-info">
+
+        <div>
+
+          <strong>地址</strong>
+
+          <p>科育社区-中关村40号楼北侧平房</p>
+
+        </div>
+
+        <div>
+
+          <strong>开放时间</strong>
+
+          <p>周一至周日 08:00 – 20:00</p>
+
+        </div>
+
+        <div>
+
+          <strong>咨询</strong>
+
+          <p>010-62563398</p>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="footer-bottom">
+
+      <p>© 2026 阅享空间 · 社区共享图书馆 · <a href="/admin/login" class="admin-entry">管理员入口</a></p>
+
+    </div>
+
+  </footer>
+
+
+
+  <div class="modal-overlay" id="borrowModal">
+
+    <div class="modal">
+
+      <button class="modal-close" data-close="borrowModal" aria-label="关闭">
+
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+
+      </button>
+
+      <div class="modal-book-preview" id="borrowBookPreview"></div>
+
+      <form class="booking-form" id="borrowForm">
+
+        <input type="hidden" id="borrowBookId">
+
+        <div class="form-row">
+
+          <div class="form-group">
+
+            <label for="borrowName">姓名</label>
+
+            <input type="text" id="borrowName" placeholder="请输入真实姓名" required>
+
+          </div>
+
+          <div class="form-group">
+
+            <label for="borrowPhone">手机号</label>
+
+            <input type="tel" id="borrowPhone" placeholder="11 位手机号码" pattern="[0-9]{11}" required>
+
+          </div>
+
+        </div>
+
+        <div class="form-group">
+
+          <label for="borrowCard">读者证号（选填）</label>
+
+          <input type="text" id="borrowCard" placeholder="如有社区读者证请填写">
+
+        </div>
+
+        <div class="form-summary visible" id="borrowSummary"></div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg">确认借阅</button>
+
+      </form>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="modal-overlay" id="roomCalendarModal">
+
+    <div class="modal modal-room-calendar">
+
+      <button class="modal-close" data-close="roomCalendarModal" aria-label="关闭">
+
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+
+      </button>
+
+      <div class="modal-header">
+
+        <span class="section-tag">Calendar</span>
+
+        <h2 class="modal-title">选择预约日期</h2>
+
+        <p class="room-calendar-notice">仅开放未来 <strong>14 天（两周）</strong>内的活动室预约 · 深色时段为已占用</p>
+
+      </div>
+
+      <div class="room-calendar-legend">
+
+        <span class="room-legend-item"><span class="room-legend-dot free"></span>可预约</span>
+
+        <span class="room-legend-item"><span class="room-legend-dot booked"></span>已占用</span>
+
+        <span class="room-legend-item"><span class="room-legend-dot past"></span>已过期</span>
+
+      </div>
+
+      <p class="room-calendar-range" id="roomCalendarRange"></p>
+
+      <div class="room-calendar-grid" id="roomCalendarGrid"></div>
+
+      <div class="room-calendar-detail hidden" id="roomCalendarDetail">
+
+        <h3 id="roomCalendarDetailTitle"></h3>
+
+        <div class="room-calendar-slots" id="roomCalendarSlotGrid"></div>
+
+        <button type="button" class="btn btn-primary btn-block" id="roomCalendarProceed" disabled>下一步 · 填写预约信息</button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="modal-overlay" id="roomModal">
+
+    <div class="modal">
+
+      <button class="modal-close" data-close="roomModal" aria-label="关闭">
+
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+
+      </button>
+
+      <div class="modal-header">
+
+        <span class="section-tag">Reservation</span>
+
+        <h2 class="modal-title">社区共享活动室</h2>
+
+        <p class="modal-subtitle">预约读书分享、讲座、聚会等活动</p>
+
+      </div>
+
+      <form class="booking-form" id="roomForm">
+
+        <div class="form-row">
+
+          <div class="form-group">
+
+            <label>预约日期</label>
+
+            <p class="room-selected-date" id="roomDateDisplay">—</p>
+
+            <input type="hidden" id="roomDate" required>
+
+          </div>
+
+          <div class="form-group">
+
+            <label for="roomDuration">使用时长</label>
+
+            <select id="roomDuration" required>
+
+              <option value="1">1 小时</option>
+
+              <option value="2" selected>2 小时</option>
+
+              <option value="3">3 小时</option>
+
+            </select>
+
+          </div>
+
+        </div>
+
+        <div class="form-group">
+
+          <label>选择时段</label>
+
+          <div class="time-slots" id="roomTimeSlots"></div>
+
+        </div>
+
+        <div class="form-group">
+
+          <label for="roomPurpose">活动用途</label>
+
+          <input type="text" id="roomPurpose" placeholder="如：读书分享会、社区讲座" required>
+
+        </div>
+
+        <div class="form-row">
+
+          <div class="form-group">
+
+            <label for="roomName">联系人</label>
+
+            <input type="text" id="roomName" placeholder="姓名" required>
+
+          </div>
+
+          <div class="form-group">
+
+            <label for="roomPhone">手机号</label>
+
+            <input type="tel" id="roomPhone" placeholder="11 位手机号码" pattern="[0-9]{11}" required>
+
+          </div>
+
+        </div>
+
+        <div class="form-group">
+
+          <label for="roomAttendees">预计人数</label>
+
+          <input type="number" id="roomAttendees" min="1" max="30" value="10" required>
+
+        </div>
+
+        <div class="form-summary" id="roomSummary"></div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg">确认预约</button>
+
+      </form>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="modal-overlay" id="successModal">
+
+    <div class="modal modal-success">
+
+      <div class="success-icon">
+
+        <svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="30" stroke="currentColor" stroke-width="2"/><path d="M20 32l8 8 16-16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+
+      </div>
+
+      <h2 id="successTitle">操作成功</h2>
+
+      <p class="success-code" id="successCodeLine"></p>
+
+      <p class="success-hint" id="successHint"></p>
+
+      <div class="success-details" id="successDetails"></div>
+
+      <button class="btn btn-primary btn-block" id="successClose">完成</button>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/static/js/room-calendar.js"></script>
+
+  <script src="/static/js/app.js"></script>
+
+</body>
+
+</html>
+
+
