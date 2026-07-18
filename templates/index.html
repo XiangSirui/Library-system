@@ -284,7 +284,7 @@
 
         <h2 class="section-title">社区共享活动室</h2>
 
-        <p class="section-desc">本馆仅设一间共享活动室，在线预约仅开放<strong>未来 14 天（两周）</strong>内的时段</p>
+        <p class="section-desc">本馆仅设一间共享活动室，在线预约仅开放<strong>未来 14 天（两周）</strong>内的时段。预约时须提交<strong>社区花园志愿服务照片</strong>及相关说明。</p>
 
       </div>
 
@@ -361,6 +361,8 @@
             <ul>
 
               <li>仅可预约<strong>未来 14 天（两周）内</strong>的活动室时段</li>
+
+              <li>预约前须提交<strong>社区花园志愿服务照片</strong>及相关说明</li>
 
               <li>每位居民每日最多预约 1 次，每次最长 3 小时</li>
 
@@ -606,7 +608,7 @@
 
         <h2 class="modal-title">选择预约日期</h2>
 
-        <p class="room-calendar-notice">仅开放未来 <strong>14 天（两周）</strong>内的活动室预约 · 深色时段为已占用</p>
+        <p class="room-calendar-notice">仅开放未来 <strong>14 天（两周）</strong>内的活动室预约 · 灰色为不可预约时段</p>
 
       </div>
 
@@ -615,6 +617,8 @@
         <span class="room-legend-item"><span class="room-legend-dot free"></span>可预约</span>
 
         <span class="room-legend-item"><span class="room-legend-dot booked"></span>已占用</span>
+
+        <span class="room-legend-item"><span class="room-legend-dot closed"></span>未开放</span>
 
         <span class="room-legend-item"><span class="room-legend-dot past"></span>已过期</span>
 
@@ -656,11 +660,11 @@
 
         <h2 class="modal-title">社区共享活动室</h2>
 
-        <p class="modal-subtitle">预约读书分享、讲座、聚会等活动</p>
+        <p class="modal-subtitle">预约前请提交社区花园志愿服务照片与说明</p>
 
       </div>
 
-      <form class="booking-form" id="roomForm">
+      <form class="booking-form" id="roomForm" enctype="multipart/form-data">
 
         <div class="form-row">
 
@@ -733,6 +737,30 @@
           <label for="roomAttendees">预计人数</label>
 
           <input type="number" id="roomAttendees" min="1" max="30" value="10" required>
+
+        </div>
+
+        <div class="form-group volunteer-block">
+
+          <label for="volunteerImage">社区花园志愿服务照片 *</label>
+
+          <p class="form-hint">请上传本人在社区花园开展志愿服务的照片（JPG/PNG，不超过 5MB）</p>
+
+          <input type="file" id="volunteerImage" accept="image/jpeg,image/png,image/webp,image/gif" required>
+
+          <div class="volunteer-preview hidden" id="volunteerPreview">
+
+            <img id="volunteerPreviewImg" alt="志愿服务照片预览">
+
+          </div>
+
+        </div>
+
+        <div class="form-group">
+
+          <label for="volunteerNote">志愿服务说明 *</label>
+
+          <textarea id="volunteerNote" rows="3" placeholder="请简要说明志愿服务内容、时间与地点，例如：2026年7月在社区花园参与浇水、除草…" required minlength="5"></textarea>
 
         </div>
 

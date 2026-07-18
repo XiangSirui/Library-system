@@ -898,16 +898,35 @@ body {
   margin-top: auto;
 }
 
-.room-booking-notice {
+.room-card-notices {
+  grid-column: 1 / -1;
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.room-booking-notice {
+  display: block;
+  margin: 0;
+  padding: 0.85rem 1.15rem;
   background: rgba(26, 60, 52, 0.06);
   border-radius: var(--radius-md);
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   color: var(--color-primary-light);
+  line-height: 1.6;
+  white-space: normal;
+}
+
+.room-volunteer-notice {
+  background: rgba(196, 165, 116, 0.12);
+  color: var(--color-primary-dark);
+  border: 1px solid rgba(196, 165, 116, 0.35);
+}
+
+.room-booking-notice strong {
+  white-space: nowrap;
 }
 
 /* ========== Room Calendar Modal ========== */
@@ -1022,6 +1041,17 @@ body {
 .room-mini-slot.free { background: rgba(45, 106, 79, 0.25); }
 .room-mini-slot.booked { background: var(--color-primary); }
 .room-mini-slot.past { background: rgba(107, 101, 96, 0.2); }
+.room-mini-slot.closed { background: #c8c4bf; }
+
+.room-legend-dot.closed { background: #c8c4bf; border: 1px solid #a8a39c; }
+
+.room-cal-slot.closed {
+  background: #e8e6e3;
+  border-color: #d0cdc8;
+  color: #9a948c;
+  cursor: not-allowed;
+  opacity: 1;
+}
 
 .room-cal-avail {
   font-size: 0.65rem;
@@ -1090,6 +1120,50 @@ body {
   font-weight: 600;
   color: var(--color-primary);
   padding: 0.5rem 0;
+}
+
+.form-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 0.25rem 0 0.5rem;
+  line-height: 1.5;
+}
+
+.volunteer-block input[type="file"] {
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.volunteer-preview {
+  margin-top: 0.75rem;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  max-width: 280px;
+}
+.volunteer-preview.hidden { display: none; }
+.volunteer-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 180px;
+  object-fit: cover;
+}
+
+#volunteerNote {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  min-height: 80px;
+}
+#volunteerNote:focus {
+  outline: none;
+  border-color: var(--color-primary-light);
+  box-shadow: 0 0 0 3px rgba(45, 90, 78, 0.12);
 }
 
 @media (max-width: 640px) {
@@ -1892,9 +1966,20 @@ body {
 }
 
 .time-slot.disabled {
-  opacity: 0.35;
+  opacity: 0.45;
   cursor: not-allowed;
   text-decoration: line-through;
+  background: #f0eeeb;
+  color: #9a948c;
+}
+
+.time-slot.closed {
+  opacity: 1;
+  cursor: not-allowed;
+  background: #e8e6e3;
+  border-color: #d0cdc8;
+  color: #9a948c;
+  text-decoration: none;
 }
 
 .form-summary {

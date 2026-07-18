@@ -102,15 +102,31 @@
 
     <!-- 活动室预约 -->
     <section class="admin-panel" id="panel-rooms">
+      <div class="admin-card admin-slot-settings-card">
+        <div class="admin-room-cal-header">
+          <h2>开放时段设置</h2>
+          <p>先选择日期，再勾选该日开放时段。每天可单独设置，互不影响</p>
+        </div>
+        <div class="admin-slot-days" id="adminSlotDays"></div>
+        <div class="admin-slot-day-title" id="adminSlotDayTitle">请选择日期</div>
+        <div class="admin-slot-grid" id="adminSlotGrid"></div>
+        <div class="admin-slot-actions">
+          <button type="button" class="btn btn-outline btn-sm" id="slotSelectAll">全选当天</button>
+          <button type="button" class="btn btn-outline btn-sm" id="slotSelectNone">清空当天</button>
+          <button type="button" class="btn btn-outline btn-sm" id="slotApplyRangeBtn">保存并同步到两周内</button>
+          <button type="button" class="btn btn-primary btn-sm" id="slotSaveBtn">保存当天</button>
+        </div>
+      </div>
       <div class="admin-card admin-room-calendar-card">
         <div class="admin-room-cal-header">
           <h2>活动室占用一览</h2>
-          <p>未来 14 天内 · 深色为已预约 · 点击格子查看详情</p>
+          <p>未来 14 天内 · 深色为已预约 · 灰色斜纹为未开放 · 点击格子查看详情</p>
         </div>
         <div class="room-calendar-legend admin-legend">
           <span class="room-legend-item"><span class="room-legend-dot free"></span>空闲</span>
           <span class="room-legend-item"><span class="room-legend-dot booked"></span>已预约</span>
           <span class="room-legend-item"><span class="room-legend-dot past"></span>已过期</span>
+          <span class="room-legend-item"><span class="room-legend-dot closed"></span>未开放</span>
         </div>
         <div class="admin-schedule-wrap" id="adminRoomSchedule"></div>
         <div class="admin-schedule-tip hidden" id="adminScheduleTip"></div>
@@ -134,6 +150,7 @@
               <th>用途</th>
               <th>联系人</th>
               <th>人数</th>
+              <th>志愿服务</th>
               <th>状态</th>
               <th>操作</th>
             </tr>
@@ -143,6 +160,18 @@
       </div>
     </section>
   </main>
+
+  <!-- 志愿服务材料查看 -->
+  <div class="modal-overlay" id="volunteerModal">
+    <div class="modal admin-modal">
+      <button class="modal-close" data-close="volunteerModal">×</button>
+      <h2>志愿服务材料</h2>
+      <div id="volunteerModalBody" class="volunteer-modal-body"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-primary" data-close="volunteerModal">关闭</button>
+      </div>
+    </div>
+  </div>
 
   <!-- 图书编辑弹窗 -->
   <div class="modal-overlay" id="bookModal">

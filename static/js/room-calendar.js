@@ -91,10 +91,17 @@
 
     const slotGrid = document.getElementById('roomCalendarSlotGrid');
     slotGrid.innerHTML = day.slots.map(s => {
-      const label = s.status === 'booked' ? '已约' : s.status === 'past' ? '已过' : s.time;
+      const label = s.status === 'booked' ? `${s.time}`
+        : s.status === 'past' ? `${s.time}`
+        : s.status === 'closed' ? `${s.time}`
+        : s.time;
+      const tip = s.status === 'booked' ? '已占用'
+        : s.status === 'past' ? '已过期'
+        : s.status === 'closed' ? '未开放'
+        : '可预约';
       const cls = ['room-cal-slot', s.status, selectedSlot === s.time ? 'selected' : ''].filter(Boolean).join(' ');
       const disabled = s.status !== 'free';
-      return `<button type="button" class="${cls}" data-slot="${s.time}" ${disabled ? 'disabled' : ''}>${label}</button>`;
+      return `<button type="button" class="${cls}" data-slot="${s.time}" title="${tip}" ${disabled ? 'disabled' : ''}>${label}</button>`;
     }).join('');
 
     slotGrid.querySelectorAll('.room-cal-slot:not([disabled])').forEach(btn => {

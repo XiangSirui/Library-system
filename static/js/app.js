@@ -28,13 +28,17 @@ const ACTIVITY_ROOM = {
 
 
 
-const TIME_SLOTS = [
+const ALL_TIME_SLOTS = [
 
   '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
 
   '14:00', '15:00', '16:00', '17:00', '18:00', '19:00'
 
 ];
+
+let TIME_SLOTS = [...ALL_TIME_SLOTS];
+
+let openRoomSlots = [...ALL_TIME_SLOTS];
 
 
 
@@ -774,9 +778,11 @@ async function renderRoomShowcase() {
 
   const stats = await apiRequest('/api/room/stats');
 
-  const bookedToday = stats.bookedCount;
+  const slotsLeft = stats.freeSlots != null
 
-  const slotsLeft = TIME_SLOTS.length - bookedToday;
+    ? stats.freeSlots
+
+    : Math.max(0, (stats.openCount || TIME_SLOTS.length) - (stats.bookedCount || 0));
 
 
 
@@ -820,8 +826,11 @@ async function renderRoomShowcase() {
 
         </div>
 
-        <p class="room-booking-notice">📅 仅开放未来 <strong>14 天（两周）</strong>内预约 · 点击按钮查看占用情况</p>
+      </div>
 
+      <div class="room-card-notices">
+        <p class="room-booking-notice">📅 仅开放未来 <strong>14 天（两周）</strong>内预约 · 点击按钮查看占用情况</p>
+        <p class="room-booking-notice room-volunteer-notice">🪴 预约须提交<strong>社区花园志愿服务照片</strong>与相关说明，方可完成预约</p>
       </div>
 
     </div>
@@ -852,6 +861,12 @@ function openRoomBookingForm(date, timeSlot) {
 
   document.getElementById('roomDuration').value = '2';
 
+  document.getElementById('volunteerNote').value = '';
+
+  document.getElementById('volunteerImage').value = '';
+
+  document.getElementById('volunteerPreview').classList.add('hidden');
+
 
 
   document.getElementById('roomDate').value = date;
@@ -878,6 +893,10 @@ async function loadRoomTimeSlots() {
 
   bookedRoomSlots = data.bookedSlots || [];
 
+  TIME_SLOTS = data.allSlots?.length ? data.allSlots : [...ALL_TIME_SLOTS];
+
+  openRoomSlots = data.openSlots || [...ALL_TIME_SLOTS];
+
   renderRoomTimeSlots();
 
 }
@@ -898,15 +917,21 @@ function renderRoomTimeSlots() {
 
 
 
+  const openSet = new Set(openRoomSlots);
+
   document.getElementById('roomTimeSlots').innerHTML = TIME_SLOTS.map(slot => {
 
     const hour = parseInt(slot);
 
     const past = isToday && hour <= currentHour;
 
+    const closed = !openSet.has(slot);
+
     const startBooked = booked.includes(slot);
 
     let overlap = false;
+
+    let durationClosed = false;
 
     for (let i = 0; i < duration; i++) {
 
@@ -914,21 +939,27 @@ function renderRoomTimeSlots() {
 
       if (booked.includes(checkSlot)) overlap = true;
 
+      if (!openSet.has(checkSlot)) durationClosed = true;
+
     }
 
     const endHour = hour + duration;
 
     const overClose = endHour > CLOSE_HOUR;
 
-    const disabled = past || startBooked || overlap || overClose;
+    const disabled = past || closed || startBooked || overlap || overClose || durationClosed;
 
     let cls = 'time-slot';
 
-    if (disabled) cls += ' disabled';
+    if (closed) cls += ' closed';
 
-    if (selectedRoomSlot === slot) cls += ' selected';
+    else if (past || startBooked || overlap || overClose || durationClosed) cls += ' disabled';
 
-    return `<button type="button" class="${cls}" data-slot="${slot}" ${disabled ? 'disabled' : ''}>${slot}</button>`;
+    if (selectedRoomSlot === slot && !disabled) cls += ' selected';
+
+    const label = closed ? `${slot}` : slot;
+
+    return `<button type="button" class="${cls}" data-slot="${slot}" ${disabled ? 'disabled' : ''} title="${closed ? '未开放' : past ? '已过期' : startBooked || overlap ? '已占用' : slot}">${label}</button>`;
 
   }).join('');
 
@@ -1010,6 +1041,16 @@ async function handleRoomSubmit(e) {
 
   const attendees = parseInt(document.getElementById('roomAttendees').value);
 
+  const volunteerNote = document.getElementById('volunteerNote').value.trim();
+
+  const volunteerFile = document.getElementById('volunteerImage').files[0];
+
+
+
+  if (!volunteerFile) { showToast('请上传社区花园志愿服务照片', 'error'); return; }
+
+  if (!volunteerNote || volunteerNote.length < 5) { showToast('请填写志愿服务说明（至少 5 字）', 'error'); return; }
+
 
 
   const endHour = parseInt(selectedRoomSlot) + duration;
@@ -1020,19 +1061,33 @@ async function handleRoomSubmit(e) {
 
   try {
 
-    const record = await apiRequest('/api/room/bookings', {
+    const formData = new FormData();
 
-      method: 'POST',
+    formData.append('date', date);
 
-      body: JSON.stringify({
+    formData.append('timeSlot', selectedRoomSlot);
 
-        date, timeSlot: selectedRoomSlot, duration,
+    formData.append('duration', String(duration));
 
-        purpose, name, phone, attendees,
+    formData.append('purpose', purpose);
 
-      }),
+    formData.append('name', name);
 
-    });
+    formData.append('phone', phone);
+
+    formData.append('attendees', String(attendees));
+
+    formData.append('volunteerNote', volunteerNote);
+
+    formData.append('volunteerImage', volunteerFile);
+
+
+
+    const res = await fetch('/api/room/bookings', { method: 'POST', body: formData });
+
+    const record = await res.json().catch(() => ({}));
+
+    if (!res.ok) throw new Error(record.error || '预约失败');
 
 
 
@@ -1055,6 +1110,8 @@ async function handleRoomSubmit(e) {
       <div><strong>用途：</strong>${purpose}</div>
 
       <div><strong>人数：</strong>${attendees} 人</div>
+
+      <div><strong>志愿服务说明：</strong>${volunteerNote}</div>
 
     `);
 
@@ -1173,6 +1230,8 @@ async function renderRoomBookings() {
             <span>${b.attendees} 人</span>
 
             <span class="booking-code">${b.code}</span>
+
+            ${b.volunteerNote ? `<span title="${b.volunteerNote.replace(/"/g, '&quot;')}">志愿服务已提交</span>` : ''}
 
           </div>
 
@@ -1307,6 +1366,40 @@ function initForms() {
     renderRoomTimeSlots();
 
     updateRoomSummary();
+
+  });
+
+  document.getElementById('volunteerImage')?.addEventListener('change', e => {
+
+    const file = e.target.files?.[0];
+
+    const box = document.getElementById('volunteerPreview');
+
+    const img = document.getElementById('volunteerPreviewImg');
+
+    if (!file) {
+
+      box.classList.add('hidden');
+
+      return;
+
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+
+      showToast('图片不能超过 5MB', 'error');
+
+      e.target.value = '';
+
+      box.classList.add('hidden');
+
+      return;
+
+    }
+
+    img.src = URL.createObjectURL(file);
+
+    box.classList.remove('hidden');
 
   });
 

@@ -15,10 +15,13 @@ MAX_BORROWS = 3
 CLOSE_HOUR = 20
 BOOKING_DAYS = 14
 
-TIME_SLOTS = [
+# 可选时段池（管理员从此列表中勾选开放）
+ALL_TIME_SLOTS = [
     '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
     '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
 ]
+# 兼容旧代码引用
+TIME_SLOTS = ALL_TIME_SLOTS
 
 SEED_BOOKS = [
     {'id': 'b1', 'title': '活着', 'author': '余华', 'category': '文学', 'isbn': '978-7-5063-4910-6', 'copies': 3, 'cover': 'cover-1', 'cover_isbn': '9787506349106'},
@@ -102,6 +105,8 @@ def init_db():
                 phone TEXT NOT NULL,
                 attendees INTEGER NOT NULL,
                 status TEXT NOT NULL DEFAULT 'upcoming',
+                volunteer_note TEXT,
+                volunteer_image TEXT,
                 created_at TEXT NOT NULL
             );
 
@@ -124,6 +129,20 @@ def init_db():
                 display_name TEXT,
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS room_slot_settings (
+                time_slot TEXT PRIMARY KEY,
+                is_open INTEGER NOT NULL DEFAULT 1
+            );
+
+            CREATE TABLE IF NOT EXISTS room_day_slots (
+                date TEXT NOT NULL,
+                time_slot TEXT NOT NULL,
+                is_open INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (date, time_slot)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_room_day_slots_date ON room_day_slots(date);
         ''')
 
         admin_count = conn.execute('SELECT COUNT(*) FROM admins').fetchone()[0]
@@ -132,6 +151,22 @@ def init_db():
                 'INSERT INTO admins (username, password_hash, display_name, created_at) VALUES (?, ?, ?, ?)',
                 ('admin', generate_password_hash('admin123'), '管理员', datetime.now().isoformat())
             )
+
+        # 默认时段模板：全部开放；已有库仅补全缺失时段
+        for slot in ALL_TIME_SLOTS:
+            conn.execute(
+                'INSERT OR IGNORE INTO room_slot_settings (time_slot, is_open) VALUES (?, 1)',
+                (slot,)
+            )
+
+        # 兼容旧库：补充志愿服务字段
+        booking_cols = {
+            r['name'] for r in conn.execute('PRAGMA table_info(room_bookings)').fetchall()
+        }
+        if 'volunteer_note' not in booking_cols:
+            conn.execute('ALTER TABLE room_bookings ADD COLUMN volunteer_note TEXT')
+        if 'volunteer_image' not in booking_cols:
+            conn.execute('ALTER TABLE room_bookings ADD COLUMN volunteer_image TEXT')
 
         count = conn.execute('SELECT COUNT(*) FROM books').fetchone()[0]
         if count == 0:
@@ -324,6 +359,7 @@ def renew_borrow(borrow_id):
 
 
 def row_to_room_booking(row):
+    keys = row.keys()
     return {
         'id': row['id'],
         'code': row['code'],
@@ -335,8 +371,154 @@ def row_to_room_booking(row):
         'phone': row['phone'],
         'attendees': row['attendees'],
         'status': row['status'],
+        'volunteerNote': row['volunteer_note'] if 'volunteer_note' in keys else '',
+        'volunteerImage': row['volunteer_image'] if 'volunteer_image' in keys else '',
         'createdAt': row['created_at'],
     }
+
+
+def _default_open_slots_from_conn(conn):
+    rows = conn.execute(
+        'SELECT time_slot FROM room_slot_settings WHERE is_open = 1 ORDER BY time_slot'
+    ).fetchall()
+    slots = [r['time_slot'] for r in rows]
+    return slots if slots else list(ALL_TIME_SLOTS)
+
+
+def _normalize_open_slots(open_slots):
+    if not isinstance(open_slots, list):
+        return None, '参数格式错误'
+    selected = []
+    for s in open_slots:
+        slot = str(s).strip()
+        if slot in ALL_TIME_SLOTS and slot not in selected:
+            selected.append(slot)
+    if not selected:
+        return None, '请至少开放一个时段'
+    return selected, None
+
+
+def get_open_time_slots(date=None):
+    """返回某日开放时段；未单独配置时用默认模板"""
+    with get_db() as conn:
+        if date:
+            rows = conn.execute(
+                'SELECT time_slot, is_open FROM room_day_slots WHERE date = ?',
+                (date,)
+            ).fetchall()
+            if rows:
+                open_set = {r['time_slot'] for r in rows if r['is_open']}
+                return [s for s in ALL_TIME_SLOTS if s in open_set]
+        return _default_open_slots_from_conn(conn)
+
+
+def get_default_slot_settings():
+    """默认时段模板（未单独配置的日期使用）"""
+    with get_db() as conn:
+        by_slot = {
+            r['time_slot']: bool(r['is_open'])
+            for r in conn.execute('SELECT time_slot, is_open FROM room_slot_settings').fetchall()
+        }
+    return {
+        'allSlots': list(ALL_TIME_SLOTS),
+        'openSlots': [s for s in ALL_TIME_SLOTS if by_slot.get(s, True)],
+        'slots': [{'time': s, 'isOpen': by_slot.get(s, True)} for s in ALL_TIME_SLOTS],
+    }
+
+
+def set_default_open_slots(open_slots):
+    selected, err = _normalize_open_slots(open_slots)
+    if err:
+        return None, err
+    with get_db() as conn:
+        for slot in ALL_TIME_SLOTS:
+            conn.execute(
+                '''INSERT INTO room_slot_settings (time_slot, is_open) VALUES (?, ?)
+                   ON CONFLICT(time_slot) DO UPDATE SET is_open = excluded.is_open''',
+                (slot, 1 if slot in selected else 0)
+            )
+    return get_default_slot_settings(), None
+
+
+def get_day_slot_settings(date):
+    """管理员：某日时段开放状态"""
+    if not date:
+        return None, '缺少日期'
+    open_slots = get_open_time_slots(date)
+    open_set = set(open_slots)
+    with get_db() as conn:
+        customized = conn.execute(
+            'SELECT COUNT(*) FROM room_day_slots WHERE date = ?', (date,)
+        ).fetchone()[0] > 0
+    return {
+        'date': date,
+        'customized': customized,
+        'allSlots': list(ALL_TIME_SLOTS),
+        'openSlots': open_slots,
+        'slots': [{'time': s, 'isOpen': s in open_set} for s in ALL_TIME_SLOTS],
+    }, None
+
+
+def set_day_open_slots(date, open_slots, apply_to_range=False):
+    """管理员：设置某日开放时段；可选同步到未来可预约范围内所有日期"""
+    if not date:
+        return None, '缺少日期'
+    selected, err = _normalize_open_slots(open_slots)
+    if err:
+        return None, err
+
+    dates = [date]
+    if apply_to_range:
+        today = datetime.now()
+        dates = [format_date(today + timedelta(days=i)) for i in range(BOOKING_DAYS + 1)]
+
+    with get_db() as conn:
+        for d in dates:
+            conn.execute('DELETE FROM room_day_slots WHERE date = ?', (d,))
+            for slot in ALL_TIME_SLOTS:
+                conn.execute(
+                    'INSERT INTO room_day_slots (date, time_slot, is_open) VALUES (?, ?, ?)',
+                    (d, slot, 1 if slot in selected else 0)
+                )
+    return get_day_slot_settings(date)[0], None
+
+
+def get_range_slot_settings(days=BOOKING_DAYS):
+    """管理员：未来 N 天每日开放概况"""
+    now = datetime.now()
+    weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    result = []
+    with get_db() as conn:
+        for offset in range(days + 1):
+            day = now + timedelta(days=offset)
+            date_str = format_date(day)
+            customized = conn.execute(
+                'SELECT COUNT(*) FROM room_day_slots WHERE date = ?', (date_str,)
+            ).fetchone()[0] > 0
+            open_slots = get_open_time_slots(date_str)
+            result.append({
+                'date': date_str,
+                'weekday': weekdays[day.weekday()],
+                'displayDay': day.day,
+                'displayMonth': day.month,
+                'isToday': offset == 0,
+                'customized': customized,
+                'openSlots': open_slots,
+                'openCount': len(open_slots),
+            })
+    return {
+        'allSlots': list(ALL_TIME_SLOTS),
+        'days': result,
+    }
+
+
+# 兼容旧命名
+def get_slot_settings():
+    return get_default_slot_settings()
+
+
+def set_open_time_slots(open_slots):
+    return set_default_open_slots(open_slots)
 
 
 def get_booked_room_slots(date):
@@ -347,14 +529,15 @@ def _slot_hour(time_slot):
     return int(time_slot.split(':')[0])
 
 
-def _occupied_slots_from_rows(rows):
+def _occupied_slots_from_rows(rows, open_slots=None):
+    open_set = set(open_slots if open_slots is not None else ALL_TIME_SLOTS)
     occupied = set()
     for row in rows:
         start = _slot_hour(row['time_slot'])
         duration = row['duration']
         for i in range(duration):
             slot = f'{start + i:02d}:00'
-            if slot in TIME_SLOTS:
+            if slot in open_set or slot in ALL_TIME_SLOTS:
                 occupied.add(slot)
     return occupied
 
@@ -372,14 +555,18 @@ def _occupied_slots_from_conn(conn, date):
     return _occupied_slots_from_rows(rows)
 
 
-def _slot_statuses_for_date(date_str, occupied, now=None):
+def _slot_statuses_for_date(date_str, occupied, open_slots, now=None, include_closed=False):
     now = now or datetime.now()
     today = format_date(now)
     current_hour = now.hour if date_str == today else -1
+    open_set = set(open_slots)
+    source = ALL_TIME_SLOTS if include_closed else open_slots
     statuses = []
-    for slot in TIME_SLOTS:
+    for slot in source:
         hour = _slot_hour(slot)
-        if date_str == today and hour <= current_hour:
+        if slot not in open_set:
+            statuses.append({'time': slot, 'status': 'closed'})
+        elif date_str == today and hour <= current_hour:
             statuses.append({'time': slot, 'status': 'past'})
         elif slot in occupied:
             statuses.append({'time': slot, 'status': 'booked'})
@@ -388,11 +575,12 @@ def _slot_statuses_for_date(date_str, occupied, now=None):
     return statuses
 
 
-def get_room_calendar(days=BOOKING_DAYS, include_details=False):
+def get_room_calendar(days=BOOKING_DAYS, include_details=False, include_closed=False):
     now = datetime.now()
     start_date = format_date(now)
     end_date = format_date(now + timedelta(days=days))
     weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    display_slots = list(ALL_TIME_SLOTS) if include_closed else None
 
     with get_db() as conn:
         rows = conn.execute(
@@ -407,13 +595,17 @@ def get_room_calendar(days=BOOKING_DAYS, include_details=False):
         by_date.setdefault(row['date'], []).append(row)
 
     calendar_days = []
+    union_open = set()
     for offset in range(days + 1):
         day = now + timedelta(days=offset)
         date_str = format_date(day)
+        day_open = get_open_time_slots(date_str)
+        union_open.update(day_open)
         day_rows = by_date.get(date_str, [])
         occupied = _occupied_slots_from_rows(day_rows)
-        slots = _slot_statuses_for_date(date_str, occupied, now)
+        slots = _slot_statuses_for_date(date_str, occupied, day_open, now, include_closed=include_closed)
         free_count = sum(1 for s in slots if s['status'] == 'free')
+        bookable_count = sum(1 for s in slots if s['status'] in ('free', 'booked', 'past'))
 
         day_data = {
             'date': date_str,
@@ -421,32 +613,25 @@ def get_room_calendar(days=BOOKING_DAYS, include_details=False):
             'displayDay': day.day,
             'displayMonth': day.month,
             'freeSlots': free_count,
-            'totalSlots': len(TIME_SLOTS),
+            'totalSlots': bookable_count if bookable_count else len(day_open),
             'isToday': date_str == start_date,
             'isFull': free_count == 0,
+            'openSlots': day_open,
             'slots': slots,
         }
         if include_details:
-            day_data['bookings'] = [
-                {
-                    'id': r['id'],
-                    'code': r['code'],
-                    'timeSlot': r['time_slot'],
-                    'duration': r['duration'],
-                    'purpose': r['purpose'],
-                    'name': r['name'],
-                    'phone': r['phone'],
-                    'attendees': r['attendees'],
-                }
-                for r in day_rows
-            ]
+            day_data['bookings'] = [row_to_room_booking(r) for r in day_rows]
         calendar_days.append(day_data)
+
+    if display_slots is None:
+        display_slots = [s for s in ALL_TIME_SLOTS if s in union_open] or list(ALL_TIME_SLOTS)
 
     return {
         'startDate': start_date,
         'endDate': end_date,
         'bookingDays': days,
-        'timeSlots': TIME_SLOTS,
+        'timeSlots': display_slots,
+        'allSlots': list(ALL_TIME_SLOTS),
         'days': calendar_days,
     }
 
@@ -479,15 +664,35 @@ def list_room_bookings(phone='', tab='upcoming'):
         return results
 
 
-def create_room_booking(date, time_slot, duration, purpose, name, phone, attendees):
-    end_hour = int(time_slot.split(':')[0]) + duration
+def create_room_booking(date, time_slot, duration, purpose, name, phone, attendees,
+                        volunteer_note='', volunteer_image=''):
+    open_slots = set(get_open_time_slots(date))
+    if time_slot not in open_slots:
+        return None, '该时段未开放预约'
+
+    note = (volunteer_note or '').strip()
+    image = (volunteer_image or '').strip()
+    if not note:
+        return None, '请填写社区花园志愿服务说明'
+    if not image:
+        return None, '请上传社区花园志愿服务照片'
+    if len(note) < 5:
+        return None, '志愿服务说明请至少填写 5 个字'
+
+    needed = []
+    for i in range(duration):
+        slot = f'{_slot_hour(time_slot) + i:02d}:00'
+        needed.append(slot)
+        if slot not in open_slots:
+            return None, '所选时长超出开放时段，请调整'
+
+    end_hour = _slot_hour(time_slot) + duration
     if end_hour > CLOSE_HOUR:
         return None, '超出闭馆时间'
 
     with get_db() as conn:
         occupied = _occupied_slots_from_conn(conn, date)
-        for i in range(duration):
-            slot = f'{_slot_hour(time_slot) + i:02d}:00'
+        for slot in needed:
             if slot in occupied:
                 return None, '该时段已被预约'
 
@@ -504,9 +709,11 @@ def create_room_booking(date, time_slot, duration, purpose, name, phone, attende
 
         conn.execute(
             '''INSERT INTO room_bookings
-               (id, code, date, time_slot, duration, purpose, name, phone, attendees, status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'upcoming', ?)''',
-            (record_id, code, date, time_slot, duration, purpose, name, phone, attendees, now.isoformat())
+               (id, code, date, time_slot, duration, purpose, name, phone, attendees,
+                status, volunteer_note, volunteer_image, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'upcoming', ?, ?, ?)''',
+            (record_id, code, date, time_slot, duration, purpose, name, phone, attendees,
+             note, image, now.isoformat())
         )
         upsert_user(conn, phone, name, None)
         row = conn.execute('SELECT * FROM room_bookings WHERE id = ?', (record_id,)).fetchone()
@@ -556,12 +763,23 @@ def get_user(phone):
 
 def room_stats_today():
     today = format_date(datetime.now())
-    with get_db() as conn:
-        count = conn.execute(
-            "SELECT COUNT(*) FROM room_bookings WHERE date = ? AND status = 'upcoming'",
-            (today,)
-        ).fetchone()[0]
-        return {'date': today, 'bookedCount': count}
+    open_slots = get_open_time_slots(today)
+    occupied = _occupied_slots_for_date(today)
+    now = datetime.now()
+    free = 0
+    for slot in open_slots:
+        hour = _slot_hour(slot)
+        if hour <= now.hour:
+            continue
+        if slot not in occupied:
+            free += 1
+    booked_open = sum(1 for s in open_slots if s in occupied and _slot_hour(s) > now.hour)
+    return {
+        'date': today,
+        'bookedCount': booked_open,
+        'openCount': len(open_slots),
+        'freeSlots': free,
+    }
 
 
 # ========== Admin ==========

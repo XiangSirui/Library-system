@@ -5,3 +5,5 @@ __pycache__/
 venv/
 library.db
 *.log
+static/uploads/volunteer/*
+!static/uploads/volunteer/.gitkeep

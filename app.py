@@ -1,14 +1,34 @@
 """阅享空间 · Flask 本地服务端"""
 
 import os
+import uuid
 from functools import wraps
+from werkzeug.utils import secure_filename
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import db
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'yuexiang-dev-secret-change-in-production')
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
+
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'volunteer')
+ALLOWED_IMAGE_EXT = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 
 db.init_db()
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+def _save_volunteer_image(file_storage):
+    if not file_storage or not file_storage.filename:
+        return None, '请上传社区花园志愿服务照片'
+    filename = secure_filename(file_storage.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ALLOWED_IMAGE_EXT:
+        return None, '图片格式仅支持 JPG / PNG / WEBP / GIF'
+    new_name = f'{uuid.uuid4().hex}{ext}'
+    path = os.path.join(UPLOAD_DIR, new_name)
+    file_storage.save(path)
+    return f'/static/uploads/volunteer/{new_name}', None
 
 
 def admin_required(f):
@@ -101,7 +121,8 @@ def api_renew_borrow(borrow_id):
 
 @app.route('/api/room/calendar')
 def api_room_calendar():
-    return jsonify(db.get_room_calendar())
+    # 前台展示全部时段，未开放的标为 closed（灰色），不隐藏
+    return jsonify(db.get_room_calendar(include_closed=True))
 
 
 @app.route('/api/room/slots')
@@ -109,7 +130,13 @@ def api_room_slots():
     date = request.args.get('date', '').strip()
     if not date:
         return jsonify({'error': '缺少日期参数'}), 400
-    return jsonify({'date': date, 'bookedSlots': db.get_booked_room_slots(date)})
+    open_slots = db.get_open_time_slots(date)
+    return jsonify({
+        'date': date,
+        'bookedSlots': db.get_booked_room_slots(date),
+        'openSlots': open_slots,
+        'allSlots': list(db.ALL_TIME_SLOTS),
+    })
 
 
 @app.route('/api/room/stats')
@@ -126,21 +153,42 @@ def api_list_room_bookings():
 
 @app.route('/api/room/bookings', methods=['POST'])
 def api_create_room_booking():
-    data = request.get_json(force=True, silent=True) or {}
-    date = (data.get('date') or '').strip()
-    time_slot = (data.get('timeSlot') or '').strip()
-    duration = int(data.get('duration') or 0)
-    purpose = (data.get('purpose') or '').strip()
-    name = (data.get('name') or '').strip()
-    phone = (data.get('phone') or '').strip()
-    attendees = int(data.get('attendees') or 0)
+    # 支持 multipart（含图片）与 JSON
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        date = (request.form.get('date') or '').strip()
+        time_slot = (request.form.get('timeSlot') or '').strip()
+        duration = int(request.form.get('duration') or 0)
+        purpose = (request.form.get('purpose') or '').strip()
+        name = (request.form.get('name') or '').strip()
+        phone = (request.form.get('phone') or '').strip()
+        attendees = int(request.form.get('attendees') or 0)
+        volunteer_note = (request.form.get('volunteerNote') or '').strip()
+        image_url, img_err = _save_volunteer_image(request.files.get('volunteerImage'))
+        if img_err:
+            return jsonify({'error': img_err}), 400
+    else:
+        data = request.get_json(force=True, silent=True) or {}
+        date = (data.get('date') or '').strip()
+        time_slot = (data.get('timeSlot') or '').strip()
+        duration = int(data.get('duration') or 0)
+        purpose = (data.get('purpose') or '').strip()
+        name = (data.get('name') or '').strip()
+        phone = (data.get('phone') or '').strip()
+        attendees = int(data.get('attendees') or 0)
+        volunteer_note = (data.get('volunteerNote') or '').strip()
+        image_url = (data.get('volunteerImage') or '').strip()
+        if not image_url:
+            return jsonify({'error': '请上传社区花园志愿服务照片'}), 400
 
     if not all([date, time_slot, purpose, name, phone]) or duration < 1:
         return jsonify({'error': '请填写完整信息'}), 400
     if len(phone) != 11 or not phone.isdigit():
         return jsonify({'error': '请输入正确的手机号'}), 400
 
-    record, err = db.create_room_booking(date, time_slot, duration, purpose, name, phone, attendees)
+    record, err = db.create_room_booking(
+        date, time_slot, duration, purpose, name, phone, attendees,
+        volunteer_note=volunteer_note, volunteer_image=image_url,
+    )
     if err:
         return jsonify({'error': err}), 400
     return jsonify(record), 201
@@ -259,7 +307,37 @@ def api_admin_return_borrow(borrow_id):
 @app.route('/api/admin/room/calendar')
 @admin_required
 def api_admin_room_calendar():
-    return jsonify(db.get_room_calendar(include_details=True))
+    return jsonify(db.get_room_calendar(include_details=True, include_closed=True))
+
+
+@app.route('/api/admin/room/slots', methods=['GET'])
+@admin_required
+def api_admin_get_room_slots():
+    date = request.args.get('date', '').strip()
+    if date:
+        result, err = db.get_day_slot_settings(date)
+        if err:
+            return jsonify({'error': err}), 400
+        return jsonify(result)
+    return jsonify(db.get_range_slot_settings())
+
+
+@app.route('/api/admin/room/slots', methods=['PUT'])
+@admin_required
+def api_admin_set_room_slots():
+    data = request.get_json(force=True, silent=True) or {}
+    date = (data.get('date') or '').strip()
+    open_slots = data.get('openSlots') or data.get('slots') or []
+    apply_to_range = bool(data.get('applyToRange'))
+
+    if not date:
+        # 无日期时改默认模板（兼容旧调用）
+        result, err = db.set_default_open_slots(open_slots)
+    else:
+        result, err = db.set_day_open_slots(date, open_slots, apply_to_range=apply_to_range)
+    if err:
+        return jsonify({'error': err}), 400
+    return jsonify(result)
 
 
 @app.route('/api/admin/room/bookings')
