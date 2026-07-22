@@ -2276,6 +2276,15 @@ body {
   margin-top: 0.5rem;
 }
 
+.review-rule-note {
+  margin-top: 1.75rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.6;
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;
