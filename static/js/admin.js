@@ -6,14 +6,17 @@ const PANEL_TITLES = {
   dashboard: '数据概览',
   books: '图书管理',
   borrows: '借阅记录',
+  reviews: '书评审核',
   rooms: '活动室预约',
 };
 
 let borrowStatus = 'all';
 let roomStatus = 'all';
+let reviewStatus = 'pending';
 let bookSearchTimer;
 let borrowSearchTimer;
 let roomSearchTimer;
+let reviewSearchTimer;
 let adminCalendarData = null;
 let selectedSlotDate = '';
 let slotRangeDays = [];
@@ -70,6 +73,7 @@ async function switchPanel(panel) {
   if (panel === 'dashboard') await loadDashboard();
   else if (panel === 'books') await loadBooks();
   else if (panel === 'borrows') await loadBorrows();
+  else if (panel === 'reviews') await loadReviews();
   else if (panel === 'rooms') await loadRooms();
 }
 
@@ -104,6 +108,19 @@ function initFilters() {
     clearTimeout(roomSearchTimer);
     roomSearchTimer = setTimeout(loadRooms, 300);
   });
+
+  document.querySelectorAll('#reviewFilters .filter-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#reviewFilters .filter-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      reviewStatus = btn.dataset.status;
+      loadReviews();
+    });
+  });
+  document.getElementById('reviewSearch').addEventListener('input', () => {
+    clearTimeout(reviewSearchTimer);
+    reviewSearchTimer = setTimeout(loadReviews, 300);
+  });
 }
 
 async function loadDashboard() {
@@ -117,7 +134,11 @@ async function loadDashboard() {
     <div class="stat-card"><div class="stat-value">${stats.returnedTotal}</div><div class="stat-label">累计归还</div></div>
     <div class="stat-card"><div class="stat-value">${stats.roomToday}</div><div class="stat-label">今日活动室预约</div></div>
     <div class="stat-card"><div class="stat-value">${stats.readerCount}</div><div class="stat-label">注册读者</div></div>
+    <div class="stat-card ${stats.pendingReviews ? 'danger' : ''}"><div class="stat-value">${stats.pendingReviews || 0}</div><div class="stat-label">待审书评</div></div>
+    <div class="stat-card"><div class="stat-value">${stats.approvedReviews || 0}</div><div class="stat-label">已通过书评</div></div>
   `;
+
+  updateReviewBadge(stats.pendingReviews || 0);
 
   const popular = document.getElementById('popularBooks');
   if (!stats.popularBooks.length) {
@@ -576,6 +597,110 @@ function findAdminBookingById(id) {
     if (b) return { ...b, _date: day.date };
   }
   return null;
+}
+
+function updateReviewBadge(count) {
+  const badge = document.getElementById('reviewBadge');
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = String(count);
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+function reviewStars(n) {
+  const v = Math.round(Number(n) || 0);
+  return '★'.repeat(v) + '☆'.repeat(Math.max(0, 5 - v));
+}
+
+async function loadReviews() {
+  const search = document.getElementById('reviewSearch').value.trim();
+  const params = new URLSearchParams({ status: reviewStatus });
+  if (search) params.set('search', search);
+  const records = await apiRequest(`/api/admin/reviews?${params}`);
+  const tbody = document.getElementById('reviewsTableBody');
+
+  if (!records.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">暂无书评</td></tr>';
+    return;
+  }
+
+  const statusMap = {
+    pending: ['active', '待审核'],
+    approved: ['returned', '已通过'],
+    rejected: ['overdue', '已驳回'],
+  };
+
+  tbody.innerHTML = records.map(r => {
+    const [cls, text] = statusMap[r.status] || ['returned', r.status];
+    const preview = r.content.length > 60 ? r.content.slice(0, 60) + '…' : r.content;
+    return `
+      <tr>
+        <td><strong>${esc(r.bookTitle || r.bookId)}</strong><br><small>${esc(r.bookAuthor || '')}</small></td>
+        <td>${esc(r.name)}<br><small>${r.phone}</small></td>
+        <td class="review-stars-cell">${reviewStars(r.rating)}</td>
+        <td class="review-content-cell" title="${escAttr(r.content)}">${esc(preview)}${r.rejectReason ? `<br><small class="reject-reason">驳回：${esc(r.rejectReason)}</small>` : ''}</td>
+        <td><span class="status-badge ${cls}">${text}</span></td>
+        <td>${(r.updatedAt || r.createdAt || '').slice(0, 16).replace('T', ' ')}</td>
+        <td class="table-actions">
+          ${r.status !== 'approved' ? `<button class="btn btn-primary btn-sm" data-approve="${r.id}">通过</button>` : ''}
+          ${r.status !== 'rejected' ? `<button class="btn btn-outline btn-sm" data-reject="${r.id}">驳回</button>` : ''}
+          <button class="btn btn-danger btn-sm" data-del-review="${r.id}">删除</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  tbody.querySelectorAll('[data-approve]').forEach(btn => {
+    btn.addEventListener('click', () => approveReview(btn.dataset.approve));
+  });
+  tbody.querySelectorAll('[data-reject]').forEach(btn => {
+    btn.addEventListener('click', () => rejectReview(btn.dataset.reject));
+  });
+  tbody.querySelectorAll('[data-del-review]').forEach(btn => {
+    btn.addEventListener('click', () => deleteReview(btn.dataset.delReview));
+  });
+}
+
+async function approveReview(id) {
+  try {
+    await apiRequest(`/api/admin/reviews/${id}/approve`, { method: 'POST' });
+    showToast('已通过');
+    await loadReviews();
+    await loadDashboard();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function rejectReview(id) {
+  const reason = prompt('驳回原因（可选）');
+  if (reason === null) return;
+  try {
+    await apiRequest(`/api/admin/reviews/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+    showToast('已驳回');
+    await loadReviews();
+    await loadDashboard();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function deleteReview(id) {
+  if (!confirm('确认删除该书评？此操作不可恢复。')) return;
+  try {
+    await apiRequest(`/api/admin/reviews/${id}`, { method: 'DELETE' });
+    showToast('已删除');
+    await loadReviews();
+    await loadDashboard();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
 }
 
 function escAttr(str) {

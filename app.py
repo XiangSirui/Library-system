@@ -221,6 +221,76 @@ def api_get_user():
     return jsonify(user)
 
 
+@app.route('/api/books/<book_id>/reviews')
+def api_book_reviews(book_id):
+    result, err = db.list_book_reviews(book_id)
+    if err:
+        return jsonify({'error': err}), 404
+    return jsonify(result)
+
+
+@app.route('/api/reviews/eligibility')
+def api_review_eligibility():
+    book_id = request.args.get('book_id', '').strip()
+    phone = request.args.get('phone', '').strip()
+    if not book_id:
+        return jsonify({'error': '缺少图书 ID'}), 400
+    result, err = db.get_review_eligibility(book_id, phone)
+    if err:
+        return jsonify({'error': err}), 404
+    return jsonify(result)
+
+
+@app.route('/api/reviews/mine')
+def api_my_reviews():
+    phone = request.args.get('phone', '').strip()
+    book_id = request.args.get('book_id', '').strip()
+    result, err = db.list_my_reviews(phone, book_id)
+    if err:
+        return jsonify({'error': err}), 400
+    return jsonify(result)
+
+
+@app.route('/api/reviews', methods=['POST'])
+def api_create_review():
+    data = request.get_json(force=True, silent=True) or {}
+    book_id = (data.get('bookId') or '').strip()
+    name = (data.get('name') or '').strip()
+    phone = (data.get('phone') or '').strip()
+    rating = data.get('rating')
+    content = (data.get('content') or '').strip()
+
+    record, err = db.create_review(book_id, phone, name, rating, content)
+    if err:
+        return jsonify({'error': err}), 400
+    return jsonify(record), 201
+
+
+@app.route('/api/reviews/<review_id>', methods=['PUT'])
+def api_update_review(review_id):
+    data = request.get_json(force=True, silent=True) or {}
+    phone = (data.get('phone') or '').strip()
+    rating = data.get('rating')
+    content = data.get('content')
+    name = data.get('name')
+    record, err = db.update_review(review_id, phone, rating=rating, content=content, name=name)
+    if err:
+        return jsonify({'error': err}), 400
+    return jsonify(record)
+
+
+@app.route('/api/reviews/<review_id>', methods=['DELETE'])
+def api_delete_review(review_id):
+    data = request.get_json(force=True, silent=True) or {}
+    phone = (data.get('phone') or request.args.get('phone') or '').strip()
+    if not phone:
+        return jsonify({'error': '缺少手机号'}), 400
+    ok, err = db.delete_review_by_user(review_id, phone)
+    if not ok:
+        return jsonify({'error': err}), 400
+    return jsonify({'ok': True})
+
+
 # ========== Admin API ==========
 
 @app.route('/api/admin/login', methods=['POST'])
@@ -363,6 +433,45 @@ def api_admin_cancel_room(booking_id):
     if err:
         return jsonify({'error': err}), 400
     return jsonify(record)
+
+
+@app.route('/api/admin/reviews')
+@admin_required
+def api_admin_reviews():
+    status = request.args.get('status', 'pending')
+    search = request.args.get('search', '').strip()
+    return jsonify(db.list_admin_reviews(status, search))
+
+
+@app.route('/api/admin/reviews/<review_id>/approve', methods=['POST'])
+@admin_required
+def api_admin_approve_review(review_id):
+    record, err = db.approve_review(review_id, session.get('admin_name') or session.get('admin_username'))
+    if err:
+        return jsonify({'error': err}), 400
+    return jsonify(record)
+
+
+@app.route('/api/admin/reviews/<review_id>/reject', methods=['POST'])
+@admin_required
+def api_admin_reject_review(review_id):
+    data = request.get_json(force=True, silent=True) or {}
+    reason = (data.get('reason') or '').strip()
+    record, err = db.reject_review(
+        review_id, reason, session.get('admin_name') or session.get('admin_username')
+    )
+    if err:
+        return jsonify({'error': err}), 400
+    return jsonify(record)
+
+
+@app.route('/api/admin/reviews/<review_id>', methods=['DELETE'])
+@admin_required
+def api_admin_delete_review(review_id):
+    ok, err = db.admin_delete_review(review_id)
+    if not ok:
+        return jsonify({'error': err}), 400
+    return jsonify({'ok': True})
 
 
 if __name__ == '__main__':

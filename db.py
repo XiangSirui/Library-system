@@ -143,7 +143,29 @@ def init_db():
             );
 
             CREATE INDEX IF NOT EXISTS idx_room_day_slots_date ON room_day_slots(date);
+
+            CREATE TABLE IF NOT EXISTS book_reviews (
+                id TEXT PRIMARY KEY,
+                book_id TEXT NOT NULL REFERENCES books(id),
+                phone TEXT NOT NULL,
+                name TEXT NOT NULL,
+                rating INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                reject_reason TEXT,
+                borrow_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                reviewed_at TEXT,
+                reviewed_by TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_reviews_book_status ON book_reviews(book_id, status);
+            CREATE INDEX IF NOT EXISTS idx_reviews_status ON book_reviews(status);
+            CREATE INDEX IF NOT EXISTS idx_reviews_phone ON book_reviews(phone);
         ''')
+
+        _migrate_book_reviews_allow_multiple(conn)
 
         admin_count = conn.execute('SELECT COUNT(*) FROM admins').fetchone()[0]
         if admin_count == 0:
@@ -179,6 +201,69 @@ def init_db():
                     (book['id'], book['title'], book['author'], book['category'],
                      book['isbn'], book['copies'], book['cover'], book['cover_isbn'])
                 )
+
+
+def _migrate_book_reviews_allow_multiple(conn):
+    """旧库 UNIQUE(book_id, phone) → 允许同一读者对同一本书发多条书评"""
+    exists = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='book_reviews'"
+    ).fetchone()
+    if not exists:
+        return
+
+    need_migrate = False
+    for idx in conn.execute('PRAGMA index_list(book_reviews)').fetchall():
+        if int(idx['unique']) != 1:
+            continue
+        # 跳过主键索引
+        origin = idx['origin'] if 'origin' in idx.keys() else ''
+        if origin == 'pk':
+            continue
+        cols = [
+            r['name']
+            for r in conn.execute(
+                "PRAGMA index_info(%s)" % idx['name'].replace('"', '""')
+            ).fetchall()
+        ]
+        if cols == ['book_id', 'phone'] or set(cols) == {'book_id', 'phone'}:
+            need_migrate = True
+            break
+        # 兼容：无 origin 字段时，非单列 id 的唯一索引也检查
+        if origin == '' and cols == ['book_id', 'phone']:
+            need_migrate = True
+            break
+
+    if not need_migrate:
+        return
+
+    conn.executescript('''
+        CREATE TABLE book_reviews_mig (
+            id TEXT PRIMARY KEY,
+            book_id TEXT NOT NULL REFERENCES books(id),
+            phone TEXT NOT NULL,
+            name TEXT NOT NULL,
+            rating INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            reject_reason TEXT,
+            borrow_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            reviewed_at TEXT,
+            reviewed_by TEXT
+        );
+        INSERT INTO book_reviews_mig
+            (id, book_id, phone, name, rating, content, status, reject_reason,
+             borrow_id, created_at, updated_at, reviewed_at, reviewed_by)
+        SELECT id, book_id, phone, name, rating, content, status, reject_reason,
+               borrow_id, created_at, updated_at, reviewed_at, reviewed_by
+        FROM book_reviews;
+        DROP TABLE book_reviews;
+        ALTER TABLE book_reviews_mig RENAME TO book_reviews;
+        CREATE INDEX IF NOT EXISTS idx_reviews_book_status ON book_reviews(book_id, status);
+        CREATE INDEX IF NOT EXISTS idx_reviews_status ON book_reviews(status);
+        CREATE INDEX IF NOT EXISTS idx_reviews_phone ON book_reviews(phone);
+    ''')
 
 
 def generate_code(prefix):
@@ -854,6 +939,12 @@ def get_admin_stats():
             (today,)
         ).fetchone()[0]
         reader_count = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+        pending_reviews = conn.execute(
+            "SELECT COUNT(*) FROM book_reviews WHERE status = 'pending'"
+        ).fetchone()[0]
+        approved_reviews = conn.execute(
+            "SELECT COUNT(*) FROM book_reviews WHERE status = 'approved'"
+        ).fetchone()[0]
 
         popular = conn.execute('''
             SELECT book_title, author, COUNT(*) AS cnt
@@ -870,6 +961,8 @@ def get_admin_stats():
             'roomUpcoming': room_upcoming,
             'roomToday': room_today,
             'readerCount': reader_count,
+            'pendingReviews': pending_reviews,
+            'approvedReviews': approved_reviews,
             'popularBooks': [
                 {'title': r['book_title'], 'author': r['author'], 'count': r['cnt']}
                 for r in popular
@@ -1023,6 +1116,341 @@ def delete_book(book_id):
         ).fetchone()[0]
         if active > 0:
             return False, f'该图书有 {active} 本尚未归还，无法删除'
+        conn.execute('DELETE FROM book_reviews WHERE book_id = ?', (book_id,))
         conn.execute('DELETE FROM borrows WHERE book_id = ?', (book_id,))
         conn.execute('DELETE FROM books WHERE id = ?', (book_id,))
+        return True, None
+
+
+# ========== Book Reviews ==========
+
+REVIEW_MIN_LEN = 10
+REVIEW_MAX_LEN = 500
+
+
+def _mask_name(name):
+    name = (name or '').strip()
+    if not name:
+        return '读者'
+    if len(name) == 1:
+        return name + '*'
+    return name[0] + '*' * (len(name) - 1)
+
+
+def row_to_review(row, mask_name=False, include_phone=False):
+    keys = row.keys()
+    item = {
+        'id': row['id'],
+        'bookId': row['book_id'],
+        'name': _mask_name(row['name']) if mask_name else row['name'],
+        'rating': row['rating'],
+        'content': row['content'],
+        'status': row['status'],
+        'rejectReason': row['reject_reason'] if 'reject_reason' in keys else '',
+        'borrowId': row['borrow_id'] if 'borrow_id' in keys else '',
+        'createdAt': row['created_at'],
+        'updatedAt': row['updated_at'],
+        'reviewedAt': row['reviewed_at'] if 'reviewed_at' in keys else '',
+        'reviewedBy': row['reviewed_by'] if 'reviewed_by' in keys else '',
+    }
+    if include_phone:
+        item['phone'] = row['phone']
+    if 'book_title' in keys:
+        item['bookTitle'] = row['book_title']
+    if 'author' in keys:
+        item['bookAuthor'] = row['author']
+    return item
+
+
+def has_borrowed_book(conn, book_id, phone):
+    row = conn.execute(
+        '''SELECT id FROM borrows
+           WHERE book_id = ? AND phone = ?
+             AND status IN ('borrowed', 'returned')
+           ORDER BY created_at DESC LIMIT 1''',
+        (book_id, phone)
+    ).fetchone()
+    return row['id'] if row else None
+
+
+def get_review_eligibility(book_id, phone):
+    book = get_book(book_id)
+    if not book:
+        return None, '图书不存在'
+    if not phone or len(phone) != 11 or not phone.isdigit():
+        return {
+            'canReview': False,
+            'reason': '请先填写有效手机号',
+            'hasBorrowed': False,
+            'myReviewCount': 0,
+            'pendingCount': 0,
+        }, None
+
+    with get_db() as conn:
+        borrow_id = has_borrowed_book(conn, book_id, phone)
+        counts = conn.execute(
+            '''SELECT
+                 COUNT(*) AS total,
+                 SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_cnt
+               FROM book_reviews WHERE book_id = ? AND phone = ?''',
+            (book_id, phone)
+        ).fetchone()
+        my_count = counts['total'] or 0
+        pending_count = counts['pending_cnt'] or 0
+
+        if not borrow_id:
+            return {
+                'canReview': False,
+                'reason': '借阅过本书后才能发表读后感',
+                'hasBorrowed': False,
+                'myReviewCount': my_count,
+                'pendingCount': pending_count,
+            }, None
+
+        return {
+            'canReview': True,
+            'reason': '',
+            'hasBorrowed': True,
+            'myReviewCount': my_count,
+            'pendingCount': pending_count,
+        }, None
+
+
+def list_book_reviews(book_id, status='approved'):
+    with get_db() as conn:
+        book = conn.execute('SELECT id FROM books WHERE id = ?', (book_id,)).fetchone()
+        if not book:
+            return None, '图书不存在'
+
+        rows = conn.execute(
+            '''SELECT * FROM book_reviews
+               WHERE book_id = ? AND status = ?
+               ORDER BY created_at DESC''',
+            (book_id, status)
+        ).fetchall()
+
+        stats = conn.execute(
+            '''SELECT COUNT(*) AS cnt, AVG(rating) AS avg_rating
+               FROM book_reviews WHERE book_id = ? AND status = 'approved' ''',
+            (book_id,)
+        ).fetchone()
+
+        return {
+            'bookId': book_id,
+            'count': stats['cnt'] or 0,
+            'avgRating': round(float(stats['avg_rating'] or 0), 1),
+            'reviews': [row_to_review(r, mask_name=True) for r in rows],
+        }, None
+
+
+def list_my_reviews(phone, book_id=''):
+    phone = (phone or '').strip()
+    if not phone or len(phone) != 11 or not phone.isdigit():
+        return None, '请输入正确的手机号'
+
+    with get_db() as conn:
+        query = '''
+            SELECT r.*, b.title AS book_title, b.author
+            FROM book_reviews r
+            JOIN books b ON b.id = r.book_id
+            WHERE r.phone = ?
+        '''
+        params = [phone]
+        if book_id:
+            query += ' AND r.book_id = ?'
+            params.append(book_id)
+        query += ''' ORDER BY CASE r.status
+            WHEN 'pending' THEN 0
+            WHEN 'rejected' THEN 1
+            ELSE 2 END, r.updated_at DESC'''
+        rows = conn.execute(query, params).fetchall()
+        return [row_to_review(r, include_phone=True) for r in rows], None
+
+
+def get_my_review(review_id, phone):
+    phone = (phone or '').strip()
+    with get_db() as conn:
+        row = conn.execute(
+            '''SELECT r.*, b.title AS book_title, b.author
+               FROM book_reviews r
+               JOIN books b ON b.id = r.book_id
+               WHERE r.id = ?''',
+            (review_id,)
+        ).fetchone()
+        if not row:
+            return None, '书评不存在'
+        if row['phone'] != phone:
+            return None, '无权查看该书评'
+        return row_to_review(row, include_phone=True), None
+
+
+def create_review(book_id, phone, name, rating, content):
+    name = (name or '').strip()
+    phone = (phone or '').strip()
+    content = (content or '').strip()
+
+    if not book_id or not name or not phone:
+        return None, '请填写完整信息'
+    if len(phone) != 11 or not phone.isdigit():
+        return None, '请输入正确的手机号'
+    try:
+        rating = int(rating)
+    except (TypeError, ValueError):
+        return None, '请选择评分'
+    if rating < 1 or rating > 5:
+        return None, '评分须为 1–5 星'
+    if len(content) < REVIEW_MIN_LEN:
+        return None, f'读后感至少 {REVIEW_MIN_LEN} 个字'
+    if len(content) > REVIEW_MAX_LEN:
+        return None, f'读后感最多 {REVIEW_MAX_LEN} 个字'
+
+    with get_db() as conn:
+        book = conn.execute('SELECT id FROM books WHERE id = ?', (book_id,)).fetchone()
+        if not book:
+            return None, '图书不存在'
+
+        borrow_id = has_borrowed_book(conn, book_id, phone)
+        if not borrow_id:
+            return None, '借阅过本书后才能发表读后感'
+
+        now = datetime.now()
+        review_id = f'{int(now.timestamp() * 1000)}{random.randint(100, 999)}'
+        now_iso = now.isoformat()
+        conn.execute(
+            '''INSERT INTO book_reviews
+               (id, book_id, phone, name, rating, content, status,
+                borrow_id, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)''',
+            (review_id, book_id, phone, name, rating, content, borrow_id, now_iso, now_iso)
+        )
+
+        upsert_user(conn, phone, name, None)
+        row = conn.execute('SELECT * FROM book_reviews WHERE id = ?', (review_id,)).fetchone()
+        return row_to_review(row, include_phone=True), None
+
+
+# 兼容旧调用名
+create_or_update_review = create_review
+
+
+def update_review(review_id, phone, rating=None, content=None, name=None):
+    phone = (phone or '').strip()
+    if not phone or len(phone) != 11 or not phone.isdigit():
+        return None, '请输入正确的手机号'
+
+    with get_db() as conn:
+        row = conn.execute('SELECT * FROM book_reviews WHERE id = ?', (review_id,)).fetchone()
+        if not row:
+            return None, '书评不存在'
+        if row['phone'] != phone:
+            return None, '无权修改该书评'
+
+        new_name = (name or row['name']).strip()
+        new_rating = row['rating'] if rating is None else int(rating)
+        new_content = row['content'] if content is None else (content or '').strip()
+
+        if new_rating < 1 or new_rating > 5:
+            return None, '评分须为 1–5 星'
+        if len(new_content) < REVIEW_MIN_LEN:
+            return None, f'读后感至少 {REVIEW_MIN_LEN} 个字'
+        if len(new_content) > REVIEW_MAX_LEN:
+            return None, f'读后感最多 {REVIEW_MAX_LEN} 个字'
+
+        now = datetime.now().isoformat()
+        conn.execute(
+            '''UPDATE book_reviews
+               SET name = ?, rating = ?, content = ?, status = 'pending',
+                   reject_reason = NULL, updated_at = ?,
+                   reviewed_at = NULL, reviewed_by = NULL
+               WHERE id = ?''',
+            (new_name, new_rating, new_content, now, review_id)
+        )
+        updated = conn.execute('SELECT * FROM book_reviews WHERE id = ?', (review_id,)).fetchone()
+        return row_to_review(updated, include_phone=True), None
+
+
+def delete_review_by_user(review_id, phone):
+    phone = (phone or '').strip()
+    with get_db() as conn:
+        row = conn.execute('SELECT * FROM book_reviews WHERE id = ?', (review_id,)).fetchone()
+        if not row:
+            return False, '书评不存在'
+        if row['phone'] != phone:
+            return False, '无权删除该书评'
+        conn.execute('DELETE FROM book_reviews WHERE id = ?', (review_id,))
+        return True, None
+
+
+def list_admin_reviews(status='pending', search=''):
+    with get_db() as conn:
+        query = '''
+            SELECT r.*, b.title AS book_title, b.author
+            FROM book_reviews r
+            JOIN books b ON b.id = r.book_id
+            WHERE 1=1
+        '''
+        params = []
+        if status and status != 'all':
+            query += ' AND r.status = ?'
+            params.append(status)
+        if search:
+            query += ' AND (b.title LIKE ? OR r.name LIKE ? OR r.phone LIKE ? OR r.content LIKE ?)'
+            like = f'%{search}%'
+            params.extend([like, like, like, like])
+        query += ' ORDER BY CASE r.status WHEN \'pending\' THEN 0 ELSE 1 END, r.updated_at DESC'
+        rows = conn.execute(query, params).fetchall()
+        return [row_to_review(r, include_phone=True) for r in rows]
+
+
+def approve_review(review_id, admin_name=''):
+    with get_db() as conn:
+        row = conn.execute('SELECT * FROM book_reviews WHERE id = ?', (review_id,)).fetchone()
+        if not row:
+            return None, '书评不存在'
+        now = datetime.now().isoformat()
+        conn.execute(
+            '''UPDATE book_reviews
+               SET status = 'approved', reject_reason = NULL,
+                   reviewed_at = ?, reviewed_by = ?, updated_at = ?
+               WHERE id = ?''',
+            (now, admin_name or None, now, review_id)
+        )
+        updated = conn.execute(
+            '''SELECT r.*, b.title AS book_title, b.author
+               FROM book_reviews r JOIN books b ON b.id = r.book_id
+               WHERE r.id = ?''',
+            (review_id,)
+        ).fetchone()
+        return row_to_review(updated, include_phone=True), None
+
+
+def reject_review(review_id, reason='', admin_name=''):
+    reason = (reason or '').strip()
+    with get_db() as conn:
+        row = conn.execute('SELECT * FROM book_reviews WHERE id = ?', (review_id,)).fetchone()
+        if not row:
+            return None, '书评不存在'
+        now = datetime.now().isoformat()
+        conn.execute(
+            '''UPDATE book_reviews
+               SET status = 'rejected', reject_reason = ?,
+                   reviewed_at = ?, reviewed_by = ?, updated_at = ?
+               WHERE id = ?''',
+            (reason or None, now, admin_name or None, now, review_id)
+        )
+        updated = conn.execute(
+            '''SELECT r.*, b.title AS book_title, b.author
+               FROM book_reviews r JOIN books b ON b.id = r.book_id
+               WHERE r.id = ?''',
+            (review_id,)
+        ).fetchone()
+        return row_to_review(updated, include_phone=True), None
+
+
+def admin_delete_review(review_id):
+    with get_db() as conn:
+        row = conn.execute('SELECT id FROM book_reviews WHERE id = ?', (review_id,)).fetchone()
+        if not row:
+            return False, '书评不存在'
+        conn.execute('DELETE FROM book_reviews WHERE id = ?', (review_id,))
         return True, None

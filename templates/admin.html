@@ -22,6 +22,7 @@
       <button class="sidebar-link active" data-panel="dashboard">概览</button>
       <button class="sidebar-link" data-panel="books">图书管理</button>
       <button class="sidebar-link" data-panel="borrows">借阅记录</button>
+      <button class="sidebar-link" data-panel="reviews">书评审核 <span class="nav-badge hidden" id="reviewBadge">0</span></button>
       <button class="sidebar-link" data-panel="rooms">活动室预约</button>
     </nav>
     <div class="sidebar-footer">
@@ -96,6 +97,35 @@
             </tr>
           </thead>
           <tbody id="borrowsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 书评审核 -->
+    <section class="admin-panel" id="panel-reviews">
+      <div class="panel-toolbar">
+        <div class="filter-tabs" id="reviewFilters">
+          <button class="filter-tab active" data-status="pending">待审核</button>
+          <button class="filter-tab" data-status="approved">已通过</button>
+          <button class="filter-tab" data-status="rejected">已驳回</button>
+          <button class="filter-tab" data-status="all">全部</button>
+        </div>
+        <input type="search" id="reviewSearch" placeholder="搜索书名、读者、内容…" class="admin-search">
+      </div>
+      <div class="admin-card table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>图书</th>
+              <th>读者</th>
+              <th>评分</th>
+              <th>读后感</th>
+              <th>状态</th>
+              <th>提交时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="reviewsTableBody"></tbody>
         </table>
       </div>
     </section>
