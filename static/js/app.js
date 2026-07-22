@@ -830,7 +830,7 @@ async function renderRoomShowcase() {
 
       <div class="room-card-notices">
         <p class="room-booking-notice">📅 仅开放未来 <strong>14 天（两周）</strong>内预约 · 点击按钮查看占用情况</p>
-        <p class="room-booking-notice room-volunteer-notice">🪴 预约须提交<strong>社区花园志愿服务照片</strong>与相关说明，方可完成预约</p>
+        <p class="room-booking-notice room-volunteer-notice">🪴 使用结束后请<strong>签退</strong>，并提交社区花园志愿服务照片与说明</p>
       </div>
 
     </div>
@@ -860,12 +860,6 @@ function openRoomBookingForm(date, timeSlot) {
   document.getElementById('roomAttendees').value = 10;
 
   document.getElementById('roomDuration').value = '2';
-
-  document.getElementById('volunteerNote').value = '';
-
-  document.getElementById('volunteerImage').value = '';
-
-  document.getElementById('volunteerPreview').classList.add('hidden');
 
 
 
@@ -1041,16 +1035,6 @@ async function handleRoomSubmit(e) {
 
   const attendees = parseInt(document.getElementById('roomAttendees').value);
 
-  const volunteerNote = document.getElementById('volunteerNote').value.trim();
-
-  const volunteerFile = document.getElementById('volunteerImage').files[0];
-
-
-
-  if (!volunteerFile) { showToast('请上传社区花园志愿服务照片', 'error'); return; }
-
-  if (!volunteerNote || volunteerNote.length < 5) { showToast('请填写志愿服务说明（至少 5 字）', 'error'); return; }
-
 
 
   const endHour = parseInt(selectedRoomSlot) + duration;
@@ -1061,33 +1045,29 @@ async function handleRoomSubmit(e) {
 
   try {
 
-    const formData = new FormData();
+    const record = await apiRequest('/api/room/bookings', {
 
-    formData.append('date', date);
+      method: 'POST',
 
-    formData.append('timeSlot', selectedRoomSlot);
+      body: JSON.stringify({
 
-    formData.append('duration', String(duration));
+        date,
 
-    formData.append('purpose', purpose);
+        timeSlot: selectedRoomSlot,
 
-    formData.append('name', name);
+        duration,
 
-    formData.append('phone', phone);
+        purpose,
 
-    formData.append('attendees', String(attendees));
+        name,
 
-    formData.append('volunteerNote', volunteerNote);
+        phone,
 
-    formData.append('volunteerImage', volunteerFile);
+        attendees,
 
+      }),
 
-
-    const res = await fetch('/api/room/bookings', { method: 'POST', body: formData });
-
-    const record = await res.json().catch(() => ({}));
-
-    if (!res.ok) throw new Error(record.error || '预约失败');
+    });
 
 
 
@@ -1099,7 +1079,7 @@ async function handleRoomSubmit(e) {
 
     closeModal('roomModal');
 
-    showSuccess('预约成功', record.code, '请保存预约码，到场时出示', `
+    showSuccess('预约成功', record.code, '请保存预约码，到场时出示；活动结束后请在「我的记录」签退', `
 
       <div><strong>空间：</strong>${ACTIVITY_ROOM.name}</div>
 
@@ -1110,8 +1090,6 @@ async function handleRoomSubmit(e) {
       <div><strong>用途：</strong>${purpose}</div>
 
       <div><strong>人数：</strong>${attendees} 人</div>
-
-      <div><strong>志愿服务说明：</strong>${volunteerNote}</div>
 
     `);
 
@@ -1138,6 +1116,98 @@ async function cancelRoomBooking(id) {
     await apiRequest(`/api/room/bookings/${id}/cancel`, { method: 'POST' });
 
     showToast('预约已取消');
+
+    await refreshAll();
+
+  } catch (err) {
+
+    showToast(err.message, 'error');
+
+  }
+
+}
+
+
+
+function openCheckoutModal(booking) {
+
+  const endHour = parseInt(booking.timeSlot) + booking.duration;
+
+  document.getElementById('checkoutBookingId').value = booking.id;
+
+  document.getElementById('volunteerNote').value = '';
+
+  document.getElementById('volunteerImage').value = '';
+
+  document.getElementById('volunteerPreview').classList.add('hidden');
+
+  document.getElementById('checkoutSummary').innerHTML = `
+
+    <div><strong>空间：</strong>${ACTIVITY_ROOM.name}</div>
+
+    <div><strong>日期：</strong>${formatDateDisplay(booking.date)}</div>
+
+    <div><strong>时间：</strong>${booking.timeSlot} – ${String(endHour).padStart(2,'0')}:00</div>
+
+    <div><strong>用途：</strong>${booking.purpose}</div>
+
+    <div><strong>预约码：</strong>${booking.code}</div>
+
+  `;
+
+  openModal('checkoutModal');
+
+}
+
+
+
+async function handleCheckoutSubmit(e) {
+
+  e.preventDefault();
+
+  const bookingId = document.getElementById('checkoutBookingId').value;
+
+  const volunteerNote = document.getElementById('volunteerNote').value.trim();
+
+  const volunteerFile = document.getElementById('volunteerImage').files[0];
+
+  const phone = getRecordsPhone() || getUser().phone || '';
+
+
+
+  if (!volunteerFile) { showToast('请上传社区花园志愿服务照片', 'error'); return; }
+
+  if (!volunteerNote || volunteerNote.length < 5) { showToast('请填写志愿服务说明（至少 5 字）', 'error'); return; }
+
+
+
+  try {
+
+    const formData = new FormData();
+
+    formData.append('volunteerNote', volunteerNote);
+
+    formData.append('volunteerImage', volunteerFile);
+
+    if (phone) formData.append('phone', phone);
+
+
+
+    const res = await fetch(`/api/room/bookings/${bookingId}/checkout`, { method: 'POST', body: formData });
+
+    const record = await res.json().catch(() => ({}));
+
+    if (!res.ok) throw new Error(record.error || '签退失败');
+
+
+
+    closeModal('checkoutModal');
+
+    showSuccess('签退成功', record.code, '感谢您提交志愿服务材料', `
+
+      <div><strong>志愿服务说明：</strong>${volunteerNote}</div>
+
+    `);
 
     await refreshAll();
 
@@ -1201,13 +1271,35 @@ async function renderRoomBookings() {
 
     const endHour = parseInt(b.timeSlot) + b.duration;
 
-    const statusClass = b.status === 'cancelled' ? 'cancelled' : roomTab === 'past' ? 'completed' : 'upcoming';
-
-    const statusText = b.status === 'cancelled' ? '已取消' : roomTab === 'past' ? '已完成' : '即将到来';
-
     const bookingTime = new Date(`${b.date}T${b.timeSlot}`);
 
+    let statusClass = 'upcoming';
+
+    let statusText = '待使用';
+
+    if (b.status === 'cancelled') {
+
+      statusClass = 'cancelled';
+
+      statusText = '已取消';
+
+    } else if (b.status === 'checked_out') {
+
+      statusClass = 'completed';
+
+      statusText = '已签退';
+
+    } else if (roomTab === 'past' || bookingTime <= now) {
+
+      statusClass = 'upcoming';
+
+      statusText = '待签退';
+
+    }
+
     const canCancel = b.status === 'upcoming' && roomTab === 'upcoming' && bookingTime > now;
+
+    const canCheckout = b.status === 'upcoming' && bookingTime <= now;
 
 
 
@@ -1231,7 +1323,7 @@ async function renderRoomBookings() {
 
             <span class="booking-code">${b.code}</span>
 
-            ${b.volunteerNote ? `<span title="${b.volunteerNote.replace(/"/g, '&quot;')}">志愿服务已提交</span>` : ''}
+            ${b.status === 'checked_out' ? '<span>志愿服务已提交</span>' : ''}
 
           </div>
 
@@ -1240,6 +1332,8 @@ async function renderRoomBookings() {
         <span class="booking-status ${statusClass}">${statusText}</span>
 
         <div class="record-actions">
+
+          ${canCheckout ? `<button class="btn btn-primary btn-sm" data-checkout-room="${b.id}">签退</button>` : ''}
 
           ${canCancel ? `<button class="btn btn-danger btn-sm" data-cancel-room="${b.id}">取消</button>` : ''}
 
@@ -1256,6 +1350,14 @@ async function renderRoomBookings() {
   list.querySelectorAll('[data-cancel-room]').forEach(btn => {
 
     btn.addEventListener('click', () => cancelRoomBooking(btn.dataset.cancelRoom));
+
+  });
+
+  list.querySelectorAll('[data-checkout-room]').forEach(btn => {
+
+    const booking = records.find(r => r.id === btn.dataset.checkoutRoom);
+
+    btn.addEventListener('click', () => openCheckoutModal(booking));
 
   });
 
@@ -1360,6 +1462,8 @@ function initForms() {
   document.getElementById('borrowForm').addEventListener('submit', handleBorrowSubmit);
 
   document.getElementById('roomForm').addEventListener('submit', handleRoomSubmit);
+
+  document.getElementById('checkoutForm')?.addEventListener('submit', handleCheckoutSubmit);
 
   document.getElementById('roomDuration').addEventListener('change', () => {
 

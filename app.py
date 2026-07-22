@@ -153,32 +153,14 @@ def api_list_room_bookings():
 
 @app.route('/api/room/bookings', methods=['POST'])
 def api_create_room_booking():
-    # 支持 multipart（含图片）与 JSON
-    if request.content_type and 'multipart/form-data' in request.content_type:
-        date = (request.form.get('date') or '').strip()
-        time_slot = (request.form.get('timeSlot') or '').strip()
-        duration = int(request.form.get('duration') or 0)
-        purpose = (request.form.get('purpose') or '').strip()
-        name = (request.form.get('name') or '').strip()
-        phone = (request.form.get('phone') or '').strip()
-        attendees = int(request.form.get('attendees') or 0)
-        volunteer_note = (request.form.get('volunteerNote') or '').strip()
-        image_url, img_err = _save_volunteer_image(request.files.get('volunteerImage'))
-        if img_err:
-            return jsonify({'error': img_err}), 400
-    else:
-        data = request.get_json(force=True, silent=True) or {}
-        date = (data.get('date') or '').strip()
-        time_slot = (data.get('timeSlot') or '').strip()
-        duration = int(data.get('duration') or 0)
-        purpose = (data.get('purpose') or '').strip()
-        name = (data.get('name') or '').strip()
-        phone = (data.get('phone') or '').strip()
-        attendees = int(data.get('attendees') or 0)
-        volunteer_note = (data.get('volunteerNote') or '').strip()
-        image_url = (data.get('volunteerImage') or '').strip()
-        if not image_url:
-            return jsonify({'error': '请上传社区花园志愿服务照片'}), 400
+    data = request.get_json(force=True, silent=True) or {}
+    date = (data.get('date') or '').strip()
+    time_slot = (data.get('timeSlot') or '').strip()
+    duration = int(data.get('duration') or 0)
+    purpose = (data.get('purpose') or '').strip()
+    name = (data.get('name') or '').strip()
+    phone = (data.get('phone') or '').strip()
+    attendees = int(data.get('attendees') or 0)
 
     if not all([date, time_slot, purpose, name, phone]) or duration < 1:
         return jsonify({'error': '请填写完整信息'}), 400
@@ -187,11 +169,37 @@ def api_create_room_booking():
 
     record, err = db.create_room_booking(
         date, time_slot, duration, purpose, name, phone, attendees,
-        volunteer_note=volunteer_note, volunteer_image=image_url,
     )
     if err:
         return jsonify({'error': err}), 400
     return jsonify(record), 201
+
+
+@app.route('/api/room/bookings/<booking_id>/checkout', methods=['POST'])
+def api_checkout_room_booking(booking_id):
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        volunteer_note = (request.form.get('volunteerNote') or '').strip()
+        phone = (request.form.get('phone') or '').strip()
+        image_url, img_err = _save_volunteer_image(request.files.get('volunteerImage'))
+        if img_err:
+            return jsonify({'error': img_err}), 400
+    else:
+        data = request.get_json(force=True, silent=True) or {}
+        volunteer_note = (data.get('volunteerNote') or '').strip()
+        phone = (data.get('phone') or '').strip()
+        image_url = (data.get('volunteerImage') or '').strip()
+        if not image_url:
+            return jsonify({'error': '请上传社区花园志愿服务照片'}), 400
+
+    record, err = db.checkout_room_booking(
+        booking_id,
+        volunteer_note=volunteer_note,
+        volunteer_image=image_url,
+        phone=phone,
+    )
+    if err:
+        return jsonify({'error': err}), 400
+    return jsonify(record)
 
 
 @app.route('/api/room/bookings/<booking_id>/cancel', methods=['POST'])

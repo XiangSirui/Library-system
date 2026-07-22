@@ -284,7 +284,7 @@
 
         <h2 class="section-title">社区共享活动室</h2>
 
-        <p class="section-desc">本馆仅设一间共享活动室，在线预约仅开放<strong>未来 14 天（两周）</strong>内的时段。预约时须提交<strong>社区花园志愿服务照片</strong>及相关说明。</p>
+        <p class="section-desc">本馆仅设一间共享活动室，在线预约仅开放<strong>未来 14 天（两周）</strong>内的时段。使用结束后请<strong>签退</strong>，并提交社区花园志愿服务照片与说明。</p>
 
       </div>
 
@@ -362,11 +362,11 @@
 
               <li>仅可预约<strong>未来 14 天（两周）内</strong>的活动室时段</li>
 
-              <li>预约前须提交<strong>社区花园志愿服务照片</strong>及相关说明</li>
-
               <li>每位居民每日最多预约 1 次，每次最长 3 小时</li>
 
               <li>活动人数不超过 30 人，请提前 15 分钟到场签到</li>
+
+              <li>活动开始后请在「我的记录」中<strong>签退</strong>，并提交<strong>社区花园志愿服务照片</strong>与说明</li>
 
               <li>使用后请恢复场地整洁，爱护公共设施</li>
 
@@ -660,11 +660,11 @@
 
         <h2 class="modal-title">社区共享活动室</h2>
 
-        <p class="modal-subtitle">预约前请提交社区花园志愿服务照片与说明</p>
+        <p class="modal-subtitle">选择时段并填写联系信息即可预约；使用后请在「我的记录」签退并提交志愿服务材料</p>
 
       </div>
 
-      <form class="booking-form" id="roomForm" enctype="multipart/form-data">
+      <form class="booking-form" id="roomForm">
 
         <div class="form-row">
 
@@ -740,6 +740,44 @@
 
         </div>
 
+        <div class="form-summary" id="roomSummary"></div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg">确认预约</button>
+
+      </form>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="modal-overlay" id="checkoutModal">
+
+    <div class="modal modal-lg">
+
+      <button class="modal-close" data-close="checkoutModal" aria-label="关闭">
+
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+
+      </button>
+
+      <div class="modal-header">
+
+        <span class="section-tag">Check-out</span>
+
+        <h2 class="modal-title">活动室签退</h2>
+
+        <p class="modal-subtitle">请上传社区花园志愿服务照片并填写说明，完成签退</p>
+
+      </div>
+
+      <form class="booking-form" id="checkoutForm" enctype="multipart/form-data">
+
+        <input type="hidden" id="checkoutBookingId">
+
+        <div class="form-summary" id="checkoutSummary"></div>
+
         <div class="form-group volunteer-block">
 
           <label for="volunteerImage">社区花园志愿服务照片 *</label>
@@ -764,9 +802,7 @@
 
         </div>
 
-        <div class="form-summary" id="roomSummary"></div>
-
-        <button type="submit" class="btn btn-primary btn-block btn-lg">确认预约</button>
+        <button type="submit" class="btn btn-primary btn-block btn-lg">确认签退</button>
 
       </form>
 

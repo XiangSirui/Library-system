@@ -167,6 +167,8 @@ def init_db():
             conn.execute('ALTER TABLE room_bookings ADD COLUMN volunteer_note TEXT')
         if 'volunteer_image' not in booking_cols:
             conn.execute('ALTER TABLE room_bookings ADD COLUMN volunteer_image TEXT')
+        if 'checkout_at' not in booking_cols:
+            conn.execute('ALTER TABLE room_bookings ADD COLUMN checkout_at TEXT')
 
         count = conn.execute('SELECT COUNT(*) FROM books').fetchone()[0]
         if count == 0:
@@ -373,6 +375,7 @@ def row_to_room_booking(row):
         'status': row['status'],
         'volunteerNote': row['volunteer_note'] if 'volunteer_note' in keys else '',
         'volunteerImage': row['volunteer_image'] if 'volunteer_image' in keys else '',
+        'checkoutAt': row['checkout_at'] if 'checkout_at' in keys else '',
         'createdAt': row['created_at'],
     }
 
@@ -664,20 +667,10 @@ def list_room_bookings(phone='', tab='upcoming'):
         return results
 
 
-def create_room_booking(date, time_slot, duration, purpose, name, phone, attendees,
-                        volunteer_note='', volunteer_image=''):
+def create_room_booking(date, time_slot, duration, purpose, name, phone, attendees):
     open_slots = set(get_open_time_slots(date))
     if time_slot not in open_slots:
         return None, '该时段未开放预约'
-
-    note = (volunteer_note or '').strip()
-    image = (volunteer_image or '').strip()
-    if not note:
-        return None, '请填写社区花园志愿服务说明'
-    if not image:
-        return None, '请上传社区花园志愿服务照片'
-    if len(note) < 5:
-        return None, '志愿服务说明请至少填写 5 个字'
 
     needed = []
     for i in range(duration):
@@ -710,14 +703,56 @@ def create_room_booking(date, time_slot, duration, purpose, name, phone, attende
         conn.execute(
             '''INSERT INTO room_bookings
                (id, code, date, time_slot, duration, purpose, name, phone, attendees,
-                status, volunteer_note, volunteer_image, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'upcoming', ?, ?, ?)''',
+                status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'upcoming', ?)''',
             (record_id, code, date, time_slot, duration, purpose, name, phone, attendees,
-             note, image, now.isoformat())
+             now.isoformat())
         )
         upsert_user(conn, phone, name, None)
         row = conn.execute('SELECT * FROM room_bookings WHERE id = ?', (record_id,)).fetchone()
         return row_to_room_booking(row), None
+
+
+def checkout_room_booking(booking_id, volunteer_note='', volunteer_image='', phone=''):
+    """签退：提交志愿服务照片与说明，状态改为 checked_out"""
+    note = (volunteer_note or '').strip()
+    image = (volunteer_image or '').strip()
+    if not note:
+        return None, '请填写社区花园志愿服务说明'
+    if not image:
+        return None, '请上传社区花园志愿服务照片'
+    if len(note) < 5:
+        return None, '志愿服务说明请至少填写 5 个字'
+
+    with get_db() as conn:
+        row = conn.execute('SELECT * FROM room_bookings WHERE id = ?', (booking_id,)).fetchone()
+        if not row:
+            return None, '预约记录不存在'
+        if row['status'] == 'cancelled':
+            return None, '该预约已取消，无法签退'
+        if row['status'] == 'checked_out':
+            return None, '该预约已签退'
+        if row['status'] != 'upcoming':
+            return None, '当前状态不可签退'
+        if phone and row['phone'] != phone:
+            return None, '手机号与预约记录不匹配'
+
+        start = datetime.strptime(f"{row['date']}T{row['time_slot']}", '%Y-%m-%dT%H:%M')
+        if datetime.now() < start:
+            return None, '活动开始后方可签退'
+
+        now = datetime.now()
+        conn.execute(
+            '''UPDATE room_bookings
+               SET status = 'checked_out',
+                   volunteer_note = ?,
+                   volunteer_image = ?,
+                   checkout_at = ?
+               WHERE id = ?''',
+            (note, image, now.isoformat(), booking_id)
+        )
+        updated = conn.execute('SELECT * FROM room_bookings WHERE id = ?', (booking_id,)).fetchone()
+        return row_to_room_booking(updated), None
 
 
 def cancel_room_booking(booking_id):
@@ -726,7 +761,7 @@ def cancel_room_booking(booking_id):
         if not row:
             return None, '预约记录不存在'
         if row['status'] != 'upcoming':
-            return None, '该预约已取消或已完成'
+            return None, '仅未签退的有效预约可取消'
         booking_time = datetime.strptime(f"{row['date']}T{row['time_slot']}", '%Y-%m-%dT%H:%M')
         if (booking_time - datetime.now()).total_seconds() < 3600:
             return None, '开始前 1 小时内不可取消'
@@ -876,8 +911,10 @@ def list_all_room_bookings(status='all', search=''):
             query += " AND status = 'upcoming'"
         elif status == 'cancelled':
             query += " AND status = 'cancelled'"
+        elif status == 'checked_out':
+            query += " AND status = 'checked_out'"
         elif status == 'past':
-            query += " AND status != 'upcoming'"
+            query += " AND status IN ('cancelled', 'checked_out')"
         if search:
             query += ' AND (purpose LIKE ? OR name LIKE ? OR phone LIKE ? OR code LIKE ?)'
             like = f'%{search}%'
@@ -893,7 +930,7 @@ def admin_cancel_room_booking(booking_id):
         if not row:
             return None, '预约记录不存在'
         if row['status'] != 'upcoming':
-            return None, '该预约已取消或已完成'
+            return None, '该预约已取消或已签退'
         conn.execute(
             "UPDATE room_bookings SET status = 'cancelled' WHERE id = ?",
             (booking_id,)

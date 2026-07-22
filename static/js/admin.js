@@ -223,10 +223,10 @@ async function loadRooms() {
   window._adminRoomRecords = records;
   tbody.innerHTML = records.map(r => {
     const endHour = parseInt(r.timeSlot) + r.duration;
-    let statusClass = 'upcoming', statusText = '有效';
+    let statusClass = 'upcoming', statusText = '未签退';
     if (r.status === 'cancelled') { statusClass = 'cancelled'; statusText = '已取消'; }
-    else if (r.status !== 'upcoming') { statusClass = 'returned'; statusText = '已完成'; }
-    const hasVolunteer = !!(r.volunteerNote || r.volunteerImage);
+    else if (r.status === 'checked_out') { statusClass = 'returned'; statusText = '已签退'; }
+    const hasVolunteer = r.status === 'checked_out' && !!(r.volunteerNote || r.volunteerImage);
     return `
       <tr>
         <td><code>${r.code}</code></td>
@@ -269,6 +269,7 @@ function showVolunteerDetail(id) {
       <div><strong>预约码：</strong>${esc(r.code || '')}</div>
       <div><strong>联系人：</strong>${esc(r.name)}（${esc(r.phone)}）</div>
       <div><strong>日期时段：</strong>${esc(r.date || r._date || '')} ${esc(r.timeSlot || '')}</div>
+      ${r.checkoutAt ? `<div><strong>签退时间：</strong>${esc(r.checkoutAt.replace('T', ' ').slice(0, 19))}</div>` : ''}
     </div>
     <h3>说明</h3>
     <p class="volunteer-note">${esc(r.volunteerNote || '（无说明）')}</p>
