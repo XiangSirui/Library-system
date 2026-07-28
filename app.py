@@ -47,6 +47,11 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/garden')
+def garden_page():
+    return render_template('garden.html')
+
+
 @app.route('/admin/login')
 def admin_login_page():
     if session.get('admin_id'):
