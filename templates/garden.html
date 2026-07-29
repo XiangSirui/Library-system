@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="阅享空间社区共建花园：了解花园小屋、生态空间和平面布局，回顾居民共同建设花园的故事。">
-  <title>花园小屋 · 阅享空间</title>
+  <meta name="description" content="走进阅享空间社区共建花园，查看花园平面布局、居民共建历程、四季景观与花园里的植物生命。">
+  <title>关于花园 · 阅享空间</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
@@ -24,7 +24,7 @@
         <li><a href="#about" class="nav-link">花园概览</a></li>
         <li><a href="#map" class="nav-link">平面导览</a></li>
         <li><a href="#story" class="nav-link">共建故事</a></li>
-        <li><a href="#join" class="nav-link">参与共建</a></li>
+        <li><a href="#nature" class="nav-link">花园生命</a></li>
       </ul>
       <a href="/#activity-room" class="btn btn-primary nav-cta">预约活动室</a>
       <button class="mobile-menu-btn" id="gardenMenuBtn" type="button" aria-label="打开菜单" aria-expanded="false">
@@ -37,7 +37,7 @@
     <a href="#about" class="mobile-link">花园概览</a>
     <a href="#map" class="mobile-link">平面导览</a>
     <a href="#story" class="mobile-link">共建故事</a>
-    <a href="#join" class="mobile-link">参与共建</a>
+    <a href="#nature" class="mobile-link">花园生命</a>
     <a href="/" class="btn btn-outline">返回图书馆</a>
   </div>
 
@@ -77,13 +77,23 @@
         </div>
 
         <div class="garden-about-layout">
-          <figure class="garden-house-card">
-            <img src="/static/images/house.png" alt="阅享空间花园小屋外观">
-            <figcaption>
-              <strong>阅享空间 · 花园小屋</strong>
-              <span>阅读从室内延伸到自然之中</span>
-            </figcaption>
-          </figure>
+          <div class="garden-about-media">
+            <button class="garden-house-card" type="button" data-lightbox
+                    data-image="/static/images/garden/build/figure20.jpg"
+                    data-caption="绿意中的阅享空间社区花园">
+              <img src="/static/images/garden/build/figure20.jpg" alt="绿意茂盛的社区花园全景">
+              <span class="garden-photo-caption">
+                <strong>阅享空间 · 社区花园</strong>
+                <small>阅读从室内延伸到自然之中</small>
+              </span>
+            </button>
+            <button class="garden-about-inset" type="button" data-lightbox
+                    data-image="/static/images/garden/build/figure22.jpg"
+                    data-caption="居民在花园中交流与观察植物">
+              <img src="/static/images/garden/build/figure22.jpg" alt="居民在花园中交流">
+              <span>花园里的日常</span>
+            </button>
+          </div>
 
           <div class="garden-values">
             <article class="garden-value-card">
@@ -140,6 +150,39 @@
       </div>
     </section>
 
+    <section class="garden-section garden-seasons" id="seasons">
+      <div class="container">
+        <div class="garden-section-heading">
+          <div>
+            <span class="section-tag">Four Seasons</span>
+            <h2 class="section-title">同一座花园，不同的四季表情</h2>
+          </div>
+          <p>盛夏的树影、秋日的花木和冬日的积雪，共同记录着空间在时间里的变化。</p>
+        </div>
+
+        <div class="season-grid">
+          <button class="season-card season-card-main" type="button" data-lightbox
+                  data-image="/static/images/garden/build/figure15.jpg"
+                  data-caption="阳光下的花园小屋与生态庭院">
+            <img src="/static/images/garden/build/figure15.jpg" alt="阳光下的花园小屋与生态庭院" loading="lazy">
+            <span><b>向阳而生</b><small>绿意环绕的花园日常</small></span>
+          </button>
+          <button class="season-card" type="button" data-lightbox
+                  data-image="/static/images/garden/build/figure18.jpg"
+                  data-caption="冬雪覆盖花园中的曲线花池">
+            <img src="/static/images/garden/build/figure18.jpg" alt="冬雪覆盖花园中的曲线花池" loading="lazy">
+            <span><b>冬日留白</b><small>雪让花园的轮廓更加清晰</small></span>
+          </button>
+          <button class="season-card" type="button" data-lightbox
+                  data-image="/static/images/garden/build/figure21.jpg"
+                  data-caption="雪地中依然生长的花园植物">
+            <img src="/static/images/garden/build/figure21.jpg" alt="雪地中生长的绿色植物" loading="lazy">
+            <span><b>静待新生</b><small>寒意里也藏着生命的力量</small></span>
+          </button>
+        </div>
+      </div>
+    </section>
+
     <section class="garden-section garden-story" id="story">
       <div class="container">
         <div class="garden-section-heading">
@@ -151,29 +194,29 @@
         </div>
 
         <div class="garden-gallery">
-          <button class="garden-photo photo-wide" type="button" data-image="/static/images/garden/build/figure6.jpg" data-caption="居民与志愿者一起整理材料、协作施工">
-            <img src="/static/images/garden/build/figure6.jpg" alt="居民与志愿者共同整理材料并施工" loading="lazy">
-            <span><b>一起动手</b>让设想落在土地上</span>
+          <button class="garden-photo photo-wide" type="button" data-lightbox data-image="/static/images/garden/build/figure8.jpg" data-caption="居民、儿童和志愿者在现场共同讨论花园建设">
+            <img src="/static/images/garden/build/figure8.jpg" alt="居民、儿童和志愿者共同讨论花园建设" loading="lazy">
+            <span><b>先听见每个人的想法</b>共建从交流与讨论开始</span>
           </button>
-          <button class="garden-photo" type="button" data-image="/static/images/garden/build/figure2.jpg" data-caption="建设开始前的现场交流与分工">
-            <img src="/static/images/garden/build/figure2.jpg" alt="居民和志愿者在花园现场讨论分工" loading="lazy">
-            <span><b>共同商量</b>从讨论和分工开始</span>
+          <button class="garden-photo photo-tall" type="button" data-lightbox data-image="/static/images/garden/build/figure7.jpg" data-caption="不同年龄的参与者一起铺设花园砖石">
+            <img src="/static/images/garden/build/figure7.jpg" alt="居民和儿童一起铺设花园砖石" loading="lazy">
+            <span><b>一砖一瓦</b>让不同年龄的人共同参与</span>
           </button>
-          <button class="garden-photo" type="button" data-image="/static/images/garden/build/figure3.jpg" data-caption="不同年龄的参与者一起铺设砖石">
-            <img src="/static/images/garden/build/figure3.jpg" alt="居民和志愿者一起铺设砖石" loading="lazy">
-            <span><b>一砖一瓦</b>搭起共同的花园</span>
+          <button class="garden-photo" type="button" data-lightbox data-image="/static/images/garden/build/figure9.jpg" data-caption="志愿者一起翻整土地、养护植物">
+            <img src="/static/images/garden/build/figure9.jpg" alt="志愿者一起翻整花园土地" loading="lazy">
+            <span><b>一起动手</b>让设想真正落在土地上</span>
           </button>
-          <button class="garden-photo photo-tall" type="button" data-image="/static/images/garden/build/figure4.jpg" data-caption="多人配合搭建花园设施">
-            <img src="/static/images/garden/build/figure4.jpg" alt="多人配合搭建花园设施" loading="lazy">
-            <span><b>彼此协作</b>让每个人都成为建设者</span>
+          <button class="garden-photo" type="button" data-lightbox data-image="/static/images/garden/build/figure11.jpg" data-caption="儿童在志愿者陪伴下清理和观察花池">
+            <img src="/static/images/garden/build/figure11.jpg" alt="儿童在志愿者陪伴下清理花池" loading="lazy">
+            <span><b>亲近自然</b>在劳动中认识脚下的土地</span>
           </button>
-          <button class="garden-photo" type="button" data-image="/static/images/garden/build/figure5.jpg" data-caption="志愿者整理土地与自然材料">
-            <img src="/static/images/garden/build/figure5.jpg" alt="志愿者整理土地与木桩" loading="lazy">
-            <span><b>整理土地</b>尊重场地原有的生命</span>
+          <button class="garden-photo photo-wide" type="button" data-lightbox data-image="/static/images/garden/build/figure13.jpg" data-caption="儿童和志愿者在花园中开展自然学习">
+            <img src="/static/images/garden/build/figure13.jpg" alt="儿童和志愿者在花园中开展自然学习" loading="lazy">
+            <span><b>在花园里学习</b>让自然教育融入社区日常</span>
           </button>
-          <button class="garden-photo" type="button" data-image="/static/images/garden/build/figure1.jpg" data-caption="花园与花卉回到社区居民的日常生活">
-            <img src="/static/images/garden/build/figure1.jpg" alt="社区居民参与花卉活动" loading="lazy">
-            <span><b>回到日常</b>让花园连接邻里生活</span>
+          <button class="garden-photo" type="button" data-lightbox data-image="/static/images/garden/build/figure14.jpg" data-caption="社区居民围绕花草开展手作与交流活动">
+            <img src="/static/images/garden/build/figure14.jpg" alt="社区居民参与花草手作活动" loading="lazy">
+            <span><b>分享与交流</b>让花草成为连接邻里的媒介</span>
           </button>
         </div>
 
@@ -183,6 +226,60 @@
           <article><span>03</span><h3>搭建</h3><p>共同完成花池与步道</p></article>
           <article><span>04</span><h3>种植</h3><p>让多样植物在此生长</p></article>
           <article><span>05</span><h3>共治</h3><p>以志愿服务持续照料</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="garden-section garden-nature" id="nature">
+      <div class="container">
+        <div class="nature-heading">
+          <div>
+            <span class="section-tag">Small Lives</span>
+            <h2 class="section-title">俯下身，看见花园里的小生命</h2>
+          </div>
+          <p>
+            花园的价值不仅在于一处漂亮的景观，也在于它为花朵、昆虫和居民创造了彼此相遇的机会。
+            微小而真实的生命，让这里每天都有新的发现。
+          </p>
+        </div>
+
+        <div class="plant-gallery">
+          <button class="plant-card plant-card-wide" type="button" data-lightbox
+                  data-image="/static/images/garden/plants/plant2.jpg"
+                  data-caption="停驻在嫩叶上的蝴蝶">
+            <img src="/static/images/garden/plants/plant2.jpg" alt="停驻在嫩叶上的蝴蝶" loading="lazy">
+            <span>访花的邻居</span>
+          </button>
+          <button class="plant-card" type="button" data-lightbox
+                  data-image="/static/images/garden/plants/plant3.jpg"
+                  data-caption="花园中盛开的白色花序">
+            <img src="/static/images/garden/plants/plant3.jpg" alt="盛开的白色花序" loading="lazy">
+            <span>盛放</span>
+          </button>
+          <button class="plant-card plant-card-tall" type="button" data-lightbox
+                  data-image="/static/images/garden/plants/plant6.jpg"
+                  data-caption="柔和光线中的紫色小花">
+            <img src="/static/images/garden/plants/plant6.jpg" alt="柔和光线中的紫色小花" loading="lazy">
+            <span>一抹紫色</span>
+          </button>
+          <button class="plant-card" type="button" data-lightbox
+                  data-image="/static/images/garden/plants/plant4.jpg"
+                  data-caption="阳光中的白色小花">
+            <img src="/static/images/garden/plants/plant4.jpg" alt="阳光中的白色小花" loading="lazy">
+            <span>向光而生</span>
+          </button>
+          <button class="plant-card" type="button" data-lightbox
+                  data-image="/static/images/garden/plants/plant5.jpg"
+                  data-caption="花园中轻盈绽放的白花">
+            <img src="/static/images/garden/plants/plant5.jpg" alt="轻盈绽放的白花" loading="lazy">
+            <span>轻盈绽放</span>
+          </button>
+          <button class="plant-card plant-card-wide" type="button" data-lightbox
+                  data-image="/static/images/garden/plants/plant1.jpg"
+                  data-caption="蝴蝶与植物共同构成的花园微景观">
+            <img src="/static/images/garden/plants/plant1.jpg" alt="蝴蝶停留在花园植物上" loading="lazy">
+            <span>共生的花园</span>
+          </button>
         </div>
       </div>
     </section>

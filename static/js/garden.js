@@ -16,7 +16,7 @@
       alt: '社区共建花园整体平面图',
       isMap: true,
     },
-    ...Array.from(document.querySelectorAll('.garden-photo')).map(button => ({
+    ...Array.from(document.querySelectorAll('[data-lightbox]')).map(button => ({
       src: button.dataset.image,
       caption: button.dataset.caption || '',
       alt: button.querySelector('img')?.alt || '花园共建照片',
@@ -70,7 +70,7 @@
 
   document.getElementById('openGardenMap')?.addEventListener('click', () => showLightbox(0));
 
-  document.querySelectorAll('.garden-photo').forEach((button, index) => {
+  document.querySelectorAll('[data-lightbox]').forEach((button, index) => {
     button.addEventListener('click', () => showLightbox(index + 1));
   });
 

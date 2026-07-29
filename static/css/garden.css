@@ -63,7 +63,7 @@ html {
 }
 
 .garden-hero-photo {
-  background: url("/static/images/garden/build/figure6.jpg") center 42% / cover no-repeat;
+  background: url("/static/images/garden/build/figure9.jpg") center 52% / cover no-repeat;
   transform: scale(1.02);
 }
 
@@ -212,13 +212,23 @@ html {
   gap: 28px;
 }
 
-.garden-house-card {
-  min-height: 590px;
+.garden-about-media {
+  height: 590px;
   position: relative;
-  margin: 0;
+}
+
+.garden-house-card {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: block;
+  padding: 0;
   overflow: hidden;
+  border: 0;
   border-radius: 8px 72px 8px 8px;
   background: #d9dfd3;
+  cursor: zoom-in;
+  text-align: left;
 }
 
 .garden-house-card img {
@@ -235,7 +245,7 @@ html {
   background: linear-gradient(transparent, rgba(18, 45, 34, 0.82));
 }
 
-.garden-house-card figcaption {
+.garden-photo-caption {
   position: absolute;
   z-index: 1;
   left: 34px;
@@ -244,20 +254,65 @@ html {
   color: #fff;
 }
 
-.garden-house-card figcaption strong,
-.garden-house-card figcaption span {
+.garden-photo-caption strong,
+.garden-photo-caption small {
   display: block;
 }
 
-.garden-house-card figcaption strong {
+.garden-photo-caption strong {
   margin-bottom: 6px;
   font-family: "Noto Serif SC", serif;
   font-size: 25px;
 }
 
-.garden-house-card figcaption span {
+.garden-photo-caption small {
   color: rgba(255, 255, 255, 0.76);
   font-size: 14px;
+}
+
+.garden-house-card img,
+.garden-about-inset img {
+  transition: transform 420ms ease;
+}
+
+.garden-house-card:hover img,
+.garden-about-inset:hover img {
+  transform: scale(1.025);
+}
+
+.garden-about-inset {
+  width: 190px;
+  height: 244px;
+  position: absolute;
+  right: -18px;
+  bottom: 34px;
+  z-index: 2;
+  display: block;
+  padding: 7px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 3px 3px 36px 3px;
+  background: var(--garden-paper);
+  box-shadow: 0 22px 48px rgba(20, 54, 41, 0.24);
+  cursor: zoom-in;
+}
+
+.garden-about-inset img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.garden-about-inset span {
+  position: absolute;
+  left: 17px;
+  bottom: 15px;
+  padding: 5px 9px;
+  color: #fff;
+  background: rgba(24, 63, 48, 0.82);
+  font-size: 11px;
+  letter-spacing: 0.06em;
 }
 
 .garden-values {
@@ -371,6 +426,78 @@ html {
   padding: 9px 16px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 13px;
+}
+
+.garden-seasons {
+  background: var(--garden-paper);
+}
+
+.season-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.7fr);
+  grid-template-rows: repeat(2, 255px);
+  gap: 14px;
+}
+
+.season-card {
+  position: relative;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  background: #c7d1c5;
+  cursor: zoom-in;
+  text-align: left;
+}
+
+.season-card-main {
+  grid-row: 1 / 3;
+}
+
+.season-card img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform 480ms ease, filter 480ms ease;
+}
+
+.season-card::after {
+  content: "";
+  position: absolute;
+  inset: 40% 0 0;
+  background: linear-gradient(transparent, rgba(12, 38, 28, 0.76));
+}
+
+.season-card:hover img {
+  transform: scale(1.025);
+  filter: saturate(1.05);
+}
+
+.season-card > span {
+  position: absolute;
+  z-index: 1;
+  left: 26px;
+  right: 26px;
+  bottom: 24px;
+}
+
+.season-card b,
+.season-card small {
+  display: block;
+}
+
+.season-card b {
+  margin-bottom: 3px;
+  font-family: "Noto Serif SC", serif;
+  font-size: 24px;
+}
+
+.season-card small {
   color: rgba(255, 255, 255, 0.76);
   font-size: 13px;
 }
@@ -492,12 +619,105 @@ html {
   font-size: 13px;
 }
 
+.garden-nature {
+  color: #edf2e9;
+  background:
+    radial-gradient(circle at 82% 15%, rgba(110, 146, 113, 0.25), transparent 26%),
+    #102f24;
+}
+
+.nature-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.65fr);
+  gap: 80px;
+  align-items: end;
+  margin-bottom: 54px;
+}
+
+.garden-nature .section-tag {
+  color: #b8c9ae;
+}
+
+.garden-nature .section-title {
+  max-width: 760px;
+  margin-top: 14px;
+  color: #fff;
+  font-family: "Noto Serif SC", serif;
+  font-size: clamp(35px, 4.5vw, 56px);
+  line-height: 1.3;
+  letter-spacing: -0.035em;
+}
+
+.nature-heading > p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.plant-gallery {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: 235px;
+  gap: 12px;
+}
+
+.plant-card {
+  position: relative;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 3px;
+  color: #fff;
+  background: #294c3d;
+  cursor: zoom-in;
+  text-align: left;
+}
+
+.plant-card-wide {
+  grid-column: span 2;
+}
+
+.plant-card-tall {
+  grid-row: span 2;
+}
+
+.plant-card img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform 440ms ease, filter 440ms ease;
+}
+
+.plant-card::after {
+  content: "";
+  position: absolute;
+  inset: 55% 0 0;
+  background: linear-gradient(transparent, rgba(7, 28, 20, 0.7));
+}
+
+.plant-card:hover img {
+  transform: scale(1.04);
+  filter: saturate(1.08);
+}
+
+.plant-card span {
+  position: absolute;
+  z-index: 1;
+  left: 20px;
+  bottom: 17px;
+  font-family: "Noto Serif SC", serif;
+  font-size: 17px;
+}
+
 .garden-join {
   padding: 110px 0;
   color: #fff;
   background:
     linear-gradient(115deg, rgba(19, 51, 38, 0.98), rgba(29, 73, 54, 0.94)),
-    url("/static/images/garden/build/figure5.jpg") center / cover;
+    url("/static/images/garden/build/figure20.jpg") center / cover;
 }
 
 .garden-join-inner {
@@ -678,8 +898,22 @@ body.lightbox-open {
     grid-template-columns: 1fr;
   }
 
+  .garden-about-media {
+    height: 540px;
+  }
+
   .garden-house-card {
     min-height: 520px;
+  }
+
+  .season-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 430px 240px;
+  }
+
+  .season-card-main {
+    grid-column: 1 / 3;
+    grid-row: 1;
   }
 
   .garden-gallery {
@@ -693,6 +927,15 @@ body.lightbox-open {
   .garden-join-inner {
     grid-template-columns: 1fr;
     gap: 56px;
+  }
+
+  .nature-heading {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .plant-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -739,6 +982,15 @@ body.lightbox-open {
     padding: 78px 0;
   }
 
+  .garden-about-media {
+    height: 500px;
+  }
+
+  .garden-about-inset {
+    right: 18px;
+    bottom: 22px;
+  }
+
   .garden-values {
     grid-template-columns: 1fr;
   }
@@ -753,6 +1005,10 @@ body.lightbox-open {
 
   .garden-gallery {
     grid-auto-rows: 260px;
+  }
+
+  .season-grid {
+    grid-template-rows: 360px 220px;
   }
 
   .garden-timeline {
@@ -835,8 +1091,25 @@ body.lightbox-open {
   }
 
   .garden-house-card {
-    min-height: 420px;
+    min-height: 430px;
     border-radius: 6px 44px 6px 6px;
+  }
+
+  .garden-about-media {
+    height: 430px;
+  }
+
+  .garden-about-inset {
+    width: 132px;
+    height: 176px;
+    right: 12px;
+    bottom: 14px;
+    padding: 5px;
+    border-radius: 3px 3px 24px 3px;
+  }
+
+  .garden-about-inset span {
+    display: none;
   }
 
   .garden-gallery {
@@ -846,6 +1119,29 @@ body.lightbox-open {
 
   .garden-photo.photo-wide {
     grid-column: span 1;
+  }
+
+  .season-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: 330px 220px 220px;
+  }
+
+  .season-card-main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .plant-gallery {
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: 200px;
+  }
+
+  .plant-card-wide {
+    grid-column: span 2;
+  }
+
+  .plant-card-tall {
+    grid-row: span 1;
   }
 
   .garden-map-card {
