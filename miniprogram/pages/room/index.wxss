@@ -1,14 +1,14 @@
 .facilities { margin-top: 18px; }
 .date-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .date-button { padding: 10px 2px; background: #f0f2e9; font-size: 13px; border: 1px solid transparent; }
-.day-week, .day-count { font-size: 11px; opacity: .8; }
+.day-week, .day-count { font-size: 12px; opacity: 1; }
 .day-date { font-size: 17px; font-weight: 600; margin: 3px 0; }
 .selected-date { margin: 24px 0 12px; font-weight: 600; }
 .slot-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .slot { padding: 12px 2px; font-size: 15px; }
 .slot.free { background: #e6eedf; }
-.slot.booked, .slot.closed, .slot.past { background: #ecece7; color: #888c80; opacity: .8; }
-.slot-label { font-size: 10px; margin-top: 3px; }
+.slot.booked, .slot.closed, .slot.past { background: #ecece7; color: #68705f; opacity: 1; }
+.slot-label { font-size: 12px; margin-top: 3px; }
 .date-button.selected, .slot.selected { background: #315e46; color: #fffefa; border-color: #315e46; }
 .success-card { border-color: #a7bc96; }
 @media (min-width: 450px) { .date-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }

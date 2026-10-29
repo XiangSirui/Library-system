@@ -10,7 +10,7 @@
       <view class="hero-note">共商　/　共建　/　共治　/　共享</view>
     </view>
   </view>
-  <view class="notice" wx:if="{{error}}">{{error}}</view>
+  <view class="notice" wx:if="{{error}}">{{error}}<view class="actions"><button class="small ghost" bindtap="retryPhotos">重新加载照片</button></view></view>
   <view class="tabs">
     <button bindtap="scroll" data-target="about">花园概览</button><button bindtap="scroll" data-target="map">平面导览</button><button bindtap="scroll" data-target="story">共建故事</button><button bindtap="scroll" data-target="nature">花园生命</button>
   </view>

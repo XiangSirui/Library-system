@@ -12,13 +12,18 @@
 .range-setting switch { flex-shrink: 0; transform: scale(.85); transform-origin: left center; }
 .slot-statuses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .slot-state { padding: 10px 6px; text-align: center; background: #eceee7; border-radius: 8px; font-size: 13px; }
-.slot-state text { font-size: 11px; color: #777f70; } .slot-state.free { background: #e4edda; } .slot-state.booked { background: #f3dfcb; }
+.slot-state text { font-size: 12px; color: #606c5c; } .slot-state.free { background: #e4edda; } .slot-state.booked { background: #f3dfcb; }
 .slot-state.past, .slot-state.closed { color: #8b8e83; } .day-booking { padding: 12px 0; border-bottom: 1px solid #e4e7d9; }
 .date-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.date-button { padding: 12px 6px; font-size: 12px; } .date-button view + view { font-size: 11px; margin-top: 5px; }
+.date-button { padding: 12px 6px; font-size: 12px; } .date-button view + view { font-size: 12px; margin-top: 5px; }
 .material-overlay { position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; left: 0; background: rgba(20,35,24,.65); display: flex; align-items: center; justify-content: center; padding: 20px; }
-.material-card { width: 100%; max-width: 620px; height: 80vh; background: #fffefa; border-radius: 18px; padding: 24px; }
+.material-panel { width: 100%; max-width: 620px; height: 80vh; display: flex; flex-direction: column; background: #fffefa; border-radius: 18px; overflow: hidden; }
+.material-card { width: 100%; flex: 1; min-height: 0; height: 0; padding: 0 24px 24px; }
 .material-card .row { align-items: flex-start; } .material-card .subtitle { flex: 1; } .material-card button { flex-shrink: 0; }
 .material-image { margin-top: 18px; }
 @media (min-width: 700px) { .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; } .main-tabs button { flex-grow: 0; } .slot-options { grid-template-columns: repeat(3, minmax(0, 1fr)); } .date-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 @media (min-width: 1100px) { .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .stat { padding: 22px; } }
+
+.material-header { flex-shrink: 0; padding: 20px 24px 12px; background: #fffefa; }
+.material-header .subtitle { flex: 1; margin-bottom: 0; }
+.material-header button { flex-shrink: 0; }

@@ -64,8 +64,11 @@
     </block>
   </block>
   <view wx:if="{{material}}" class="material-overlay">
-    <scroll-view scroll-y class="material-card">
-      <view class="row"><view class="subtitle">志愿服务材料</view><button class="ghost small" bindtap="closeMaterial">关闭</button></view><view>{{material.name}} · {{material.date}}</view><view class="hint">预约编号：{{material.code}}</view><view class="body-text">{{material.volunteerNote || '未填写说明'}}</view><image wx:if="{{material.imageUrl}}" class="photo material-image" src="{{material.imageUrl}}" mode="widthFix" data-url="{{material.imageUrl}}" bindtap="preview" /><view class="hint">点击照片放大查看</view>
-    </scroll-view>
+    <view class="material-panel">
+      <view class="row material-header"><view class="subtitle">志愿服务材料</view><button class="ghost small" bindtap="closeMaterial">关闭</button></view>
+      <scroll-view scroll-y class="material-card">
+        <view>{{material.name}} · {{material.date}}</view><view class="hint">预约编号：{{material.code}}</view><view class="body-text">{{material.volunteerNote || '未填写说明'}}</view><image wx:if="{{material.imageUrl}}" class="photo material-image" src="{{material.imageUrl}}" mode="widthFix" data-url="{{material.imageUrl}}" bindtap="preview" /><view class="hint">点击照片放大查看</view>
+      </scroll-view>
+    </view>
   </view>
 </view>

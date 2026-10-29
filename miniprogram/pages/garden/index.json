@@ -1,1 +1,4 @@
-{"navigationBarTitleText":"阅享空间 · 花园"}
+{
+  "navigationBarTitleText": "阅享空间 · 花园",
+  "enablePullDownRefresh": true
+}

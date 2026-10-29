@@ -2,11 +2,16 @@ const api = require('../../utils/api');
 const content = require('../../data/garden');
 Page({
   data: { sections: [], map: '', hero: '', places: ['休憩廊架', '儿童活动区', '户外社区课堂', '雨水花园', '蜜源花园', '昆虫旅馆', '资源花园', '生态教育箱', '社区图书馆'], error: '' },
-  onLoad() {
-    const sections = content.map(section => Object.assign({}, section, { photos: section.photos.map(photo => Object.assign({}, photo, { url: api.asset(photo.path) })) }));
-    this.setData({ sections, map: api.asset('/static/images/garden/garden-plan.jpg'), hero: api.asset('/static/images/garden/build/figure20.jpg'), error: api.asset('/') ? '' : '花园照片将在服务配置完成后显示' });
+  onLoad() { this.loadPhotos(false); },
+  onPullDownRefresh() { this.loadPhotos(true); wx.stopPullDownRefresh(); },
+  loadPhotos(retry) {
+    const version = retry ? '?v=' + Date.now() : '';
+    const url = path => { const value = api.asset(path); return value ? value + version : ''; };
+    const sections = content.map(section => Object.assign({}, section, { photos: section.photos.map(photo => Object.assign({}, photo, { url: url(photo.path) })) }));
+    this.setData({ sections, map: url('/static/images/garden/garden-plan.jpg'), hero: url('/static/images/garden/build/figure20.jpg'), error: api.asset('/') ? '' : '花园照片将在服务配置完成后显示' });
   },
-  imageError() { if (!this.data.error) this.setData({ error: '部分照片暂时无法加载，可稍后重新打开查看' }); },
+  retryPhotos() { this.loadPhotos(true); },
+  imageError() { if (!this.data.error) this.setData({ error: '部分照片暂时无法加载，请检查网络后重试' }); },
   preview(event) {
     const url = event.currentTarget.dataset.url;
     if (!url) return;

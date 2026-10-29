@@ -6,9 +6,11 @@
   "scripts": {
     "check": "node scripts/check_miniprogram.js",
     "test": "node --test tests/miniprogram.test.js",
-    "compile": "node scripts/compile_miniprogram.js"
+    "compile": "node scripts/compile_miniprogram.js",
+    "test:layout": "node scripts/check_miniprogram_layout.js"
   },
   "devDependencies": {
-    "miniprogram-compiler": "0.2.3"
+    "miniprogram-compiler": "0.2.3",
+    "playwright": "^1.62.1"
   }
 }
