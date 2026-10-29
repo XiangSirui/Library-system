@@ -1,0 +1,3 @@
+.details { margin-top: 20px; color: #64715f; font-size: 14px; line-height: 2; }
+.checkout-photo { height: 240px; margin: 10px 0; }
+@media (min-width: 700px) { .checkout-photo { height: 300px; } }

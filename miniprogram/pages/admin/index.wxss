@@ -1,0 +1,24 @@
+.login-card { max-width: 460px; margin: 28px auto; } .admin-user { margin-top: 18px; }
+.stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.stat { padding: 18px 14px; } .stat-value { font-size: 30px; font-weight: 600; line-height: 1.3; margin-bottom: 8px; }
+.attention { border-color: #d3a991; background: #fff3e8; } .ranking { padding: 14px 0; border-bottom: 1px solid #e3e7da; } .ranking:last-child { border-bottom: 0; }
+.search input { flex: 1; min-width: 0; } .search button { flex-shrink: 0; } .add-book { margin-bottom: 20px; }
+.review-content { margin-top: 14px; } .reject-form { margin-top: 20px; padding-top: 16px; border-top: 1px solid #dce1d3; }
+.reject-form textarea { height: 110px; } .main-tabs button { flex-grow: 1; } .record-title { margin-top: 12px; }
+.slot-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.slot-option { padding: 9px 6px; background: #f5f5ed; border: 1px solid #e4e7d9; border-radius: 10px; white-space: nowrap; }
+.slot-option.selected { background: #e7efdd; border-color: #a7bb96; } .slot-option checkbox { margin-right: 0; }
+.range-setting { display: flex; align-items: center; gap: 10px; margin: 22px 0 12px; font-size: 13px; }
+.range-setting switch { flex-shrink: 0; transform: scale(.85); transform-origin: left center; }
+.slot-statuses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.slot-state { padding: 10px 6px; text-align: center; background: #eceee7; border-radius: 8px; font-size: 13px; }
+.slot-state text { font-size: 11px; color: #777f70; } .slot-state.free { background: #e4edda; } .slot-state.booked { background: #f3dfcb; }
+.slot-state.past, .slot-state.closed { color: #8b8e83; } .day-booking { padding: 12px 0; border-bottom: 1px solid #e4e7d9; }
+.date-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.date-button { padding: 12px 6px; font-size: 12px; } .date-button view + view { font-size: 11px; margin-top: 5px; }
+.material-overlay { position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; left: 0; background: rgba(20,35,24,.65); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.material-card { width: 100%; max-width: 620px; height: 80vh; background: #fffefa; border-radius: 18px; padding: 24px; }
+.material-card .row { align-items: flex-start; } .material-card .subtitle { flex: 1; } .material-card button { flex-shrink: 0; }
+.material-image { margin-top: 18px; }
+@media (min-width: 700px) { .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; } .main-tabs button { flex-grow: 0; } .slot-options { grid-template-columns: repeat(3, minmax(0, 1fr)); } .date-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .stat { padding: 22px; } }

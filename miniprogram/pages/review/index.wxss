@@ -1,0 +1,1 @@
+.review-page { max-width: 760px; } .rating { align-items: center; } .rating button { padding: 8px 13px; font-size: 22px; min-width: 44px; }

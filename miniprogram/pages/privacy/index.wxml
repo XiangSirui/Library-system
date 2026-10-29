@@ -1,0 +1,15 @@
+<view class="page privacy-page">
+  <view class="eyebrow">YOUR INFORMATION</view><view class="title">隐私说明</view>
+  <view class="card">
+    <view class="subtitle">只在你使用服务时填写</view>
+    <view class="body-text">浏览花园、馆藏和公开书评无需填写联系信息。借阅、预约、查询记录和发表书评需要你主动填写姓名、手机号，以及选填的借阅证号；这些信息用于联系、识别相应业务记录和处理服务。</view>
+    <view class="subtitle section">照片和书评</view>
+    <view>活动室签退需由你选择一张志愿服务照片并填写说明。照片和说明上传到本服务后台，供管理员核验；不会作为公开花园照片自动展示。书评经管理员审核后公开，姓名脱敏，手机号不公开。请勿上传无关人员的个人信息。</view>
+    <view class="subtitle section">本机保存</view>
+    <view>为方便再次填写，小程序会在本机保存最近使用的姓名、手机号和借阅证号。你可以在「我的」清除本机信息；此操作不会删除已经提交的借阅、预约和书评记录。管理员会话仅在本次小程序运行期间保存。</view>
+    <view class="subtitle section">查询与修改</view>
+    <view>可在「我的」查询借阅、预约和书评，按规则续借、归还、取消或修改书评。如需处理其他已提交信息，请联系到馆服务人员。</view>
+    <view class="subtitle section">授权选择</view>
+    <view>我们仅在你主动选择签退照片时调用相册或相机。你可以取消选择或拒绝授权；浏览花园和馆藏等其他功能仍可使用。</view>
+  </view>
+</view>

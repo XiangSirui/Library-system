@@ -1,0 +1,8 @@
+.query-row { display: flex; align-items: center; gap: 10px; }
+.query-row input { flex: 1; min-width: 0; } .query-row button { flex-shrink: 0; padding: 12px 14px; }
+.subtabs { margin-top: -4px; } .subtabs button { font-size: 12px; min-height: 38px; padding: 8px 14px; }
+.record-heading { margin-top: 16px; } .record-line { font-size: 13px; margin-top: 6px; color: #64715f; }
+.record .row { flex-wrap: wrap; } .code { font-size: 12px; } .overdue { background: #f5e5df; color: #983f2e; }
+.record-photo { height: 180px; margin-top: 12px; } .rating { color: #8b7639; margin-bottom: 10px; }
+.record { margin: 0; } .grid { align-items: start; }
+@media (max-width: 360px) { .query-row { flex-direction: column; align-items: stretch; } .query-row input { flex: auto; } }

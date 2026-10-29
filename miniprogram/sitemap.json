@@ -1,0 +1,8 @@
+{
+  "desc": "仅公开花园与馆藏页面可索引",
+  "rules": [
+    { "action": "allow", "page": "pages/garden/index" },
+    { "action": "allow", "page": "pages/books/index" },
+    { "action": "disallow", "page": "*" }
+  ]
+}

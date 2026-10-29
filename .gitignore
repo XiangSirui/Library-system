@@ -7,3 +7,6 @@ library.db
 *.log
 static/uploads/volunteer/*
 !static/uploads/volunteer/.gitkeep
+project.private.config.json
+.qa/
+node_modules/

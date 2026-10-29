@@ -1,0 +1,15 @@
+<view class="page">
+  <view class="eyebrow">THE COMMUNITY LIBRARY</view><view class="title">把一本好书带回家</view><view class="muted">每次最多借阅 3 本 · 借期 30 天 · 可续借一次</view>
+  <view class="search row"><input placeholder="搜索书名或作者" value="{{search}}" bindinput="searchInput" bindconfirm="load" confirm-type="search" /><button class="primary" bindtap="load">搜索</button></view>
+  <view class="tabs"><button wx:for="{{categories}}" wx:key="*this" class="{{category === item ? 'active' : ''}}" data-value="{{item}}" bindtap="filter">{{item}}</button></view>
+  <view wx:if="{{loading}}" class="notice">正在查找好书…</view>
+  <view wx:if="{{error}}" class="notice error">{{error}}<button class="small ghost" bindtap="load">重新加载</button></view>
+  <view wx:if="{{!loading && !error && !books.length}}" class="empty">没有找到相关图书，试试其他关键词吧。</view>
+  <view class="book-grid">
+    <view wx:for="{{books}}" wx:key="id" class="card book-card">
+      <view class="cover" data-id="{{item.id}}" bindtap="openBook"><view class="badge">{{item.category}}</view><view class="cover-title">{{item.title}}</view><view class="muted">{{item.author}}</view></view>
+      <view class="book-meta"><view class="record-title">{{item.title}}</view><view class="muted">{{item.author}}</view><view class="availability">{{item.available > 0 ? '可借 ' + item.available + ' / ' + item.copies + ' 本' : '暂时借完'}}</view></view>
+      <button class="{{item.available > 0 ? 'primary' : 'ghost'}}" data-id="{{item.id}}" bindtap="openBook">{{item.available > 0 ? '借阅 / 查看书评' : '查看详情与书评'}}</button>
+    </view>
+  </view>
+</view>

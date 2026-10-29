@@ -1,0 +1,16 @@
+<view class="page review-page">
+  <view class="eyebrow">YOUR READING STORY</view><view class="title">{{editing ? '编辑读后感' : '写一篇读后感'}}</view>
+  <view wx:if="{{loading}}" class="notice">正在加载…</view>
+  <view wx:if="{{error}}" class="notice error">{{error}}<button class="small ghost" bindtap="load">重试</button></view>
+  <view wx:if="{{book}}" class="card">
+    <view class="subtitle">《{{book.title}}》</view><view class="muted">{{book.author}} · 借阅过本书后可以发表</view>
+    <view class="field"><text class="label">姓名 *</text><input value="{{form.name}}" data-field="name" bindinput="input" maxlength="30" placeholder="读者姓名" /></view>
+    <view class="field"><text class="label">借阅时填写的手机号 *</text><input value="{{form.phone}}" data-field="phone" bindinput="input" type="number" maxlength="11" disabled="{{editing}}" placeholder="11 位手机号" /></view>
+    <view class="field"><text class="label">我的评分</text><view class="tabs rating"><button wx:for="{{ratings}}" wx:key="*this" class="{{form.rating >= item ? 'active' : ''}}" data-value="{{item}}" bindtap="rating" aria-label="{{item}} 分">★</button><text class="muted">{{form.rating}} / 5 分</text></view></view>
+    <view class="field"><text class="label">读后感（10–500 字）</text><textarea value="{{form.content}}" data-field="content" bindinput="input" maxlength="500" placeholder="哪些文字或故事打动了你？与邻里分享你的阅读感受。" /><view class="hint">{{form.content.length}} / 500</view></view>
+    <view class="notice">书评经审核后公开展示，姓名会脱敏。修改已发布的书评后需要重新审核。请勿在正文中写入联系方式等个人信息。</view>
+    <checkbox-group bindchange="consent"><label class="check"><checkbox value="yes" checked="{{accepted}}" color="#315e46" /><text>同意将信息用于书评审核，并在通过后公开展示读后感。</text></label></checkbox-group>
+    <view class="hint link" bindtap="privacy">阅读隐私说明</view>
+    <button class="primary" bindtap="submit" loading="{{busy}}" disabled="{{busy || loading || !!error}}">提交审核</button>
+  </view>
+</view>

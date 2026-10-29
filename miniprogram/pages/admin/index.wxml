@@ -1,0 +1,71 @@
+<view class="page">
+  <view class="eyebrow">COMMUNITY MANAGEMENT</view>
+  <view class="title">空间管理</view>
+  <view wx:if="{{checking}}" class="notice">正在确认登录状态…</view>
+  <view wx:if="{{error}}" class="notice error">{{error}}<button wx:if="{{me}}" class="ghost small" bindtap="load">重新加载</button></view>
+  <form wx:if="{{!me && !checking}}" class="card login-card" bindsubmit="login">
+    <view class="subtitle">管理员登录</view><view class="muted">使用现有管理员账号管理图书、书评与活动室。</view>
+    <view class="field"><label class="label">用户名</label><input value="{{form.username}}" data-field="username" bindinput="input" placeholder="管理员用户名" maxlength="80" /></view>
+    <view class="field"><label class="label">密码</label><input value="{{form.password}}" data-field="password" bindinput="input" password placeholder="输入密码" maxlength="128" /></view>
+    <button class="primary" form-type="submit" loading="{{busy}}" disabled="{{busy}}">登录管理后台</button>
+  </form>
+  <block wx:if="{{me}}">
+    <view class="row admin-user"><view class="muted">{{me.displayName || me.username}}</view><button class="ghost small" bindtap="logout" disabled="{{busy}}">退出登录</button></view>
+    <view class="tabs main-tabs"><button wx:for="{{panels}}" wx:key="value" class="{{panel === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="changePanel" disabled="{{busy}}">{{item.label}}</button></view>
+    <view wx:if="{{loading}}" class="notice">正在加载…</view>
+    <block wx:if="{{panel === 'dashboard'}}">
+      <view class="stats-grid"><view wx:for="{{stats}}" wx:key="key" class="card stat {{item.attention ? 'attention' : ''}}"><view class="stat-value">{{item.value}}</view><view class="muted">{{item.label}}</view></view></view>
+      <view class="section card"><view class="subtitle">热门借阅 TOP 5</view><view wx:if="{{!popularBooks.length && !loading}}" class="empty">暂无借阅数据</view><view wx:for="{{popularBooks}}" wx:key="title" class="ranking row"><view>{{index + 1}}. {{item.title}}<view class="muted">{{item.author}}</view></view><text class="badge">{{item.count}} 次</text></view></view>
+    </block>
+    <block wx:if="{{panel !== 'dashboard' && panel !== 'slots'}}">
+      <view class="row search"><input value="{{search}}" bindinput="searchInput" bindconfirm="load" confirm-type="search" placeholder="{{panel === 'books' ? '搜索书名或作者' : '搜索姓名、手机号或内容'}}" /><button class="primary" bindtap="load" disabled="{{busy}}">搜索</button></view>
+      <view class="tabs"><button wx:for="{{filters}}" wx:key="value" class="{{status === item.value ? 'active' : ''}}" bindtap="changeFilter" data-value="{{item.value}}" disabled="{{busy}}">{{item.label}}</button></view>
+      <view wx:if="{{panel === 'books'}}" class="actions add-book"><button class="primary" bindtap="addBook">添加图书</button></view>
+      <view wx:if="{{!items.length && !loading && !error}}" class="empty">暂无匹配记录</view>
+      <view class="grid">
+        <view wx:for="{{items}}" wx:key="id" class="card">
+          <block wx:if="{{panel === 'books'}}">
+            <view class="record-title">{{item.title}}</view><view class="muted">{{item.author}} · {{item.category}}</view><view class="hint">ISBN：{{item.isbn || '未填写'}}</view><view>馆藏 {{item.copies}} · 已借 {{item.borrowed}} · 可借 {{item.available}}</view>
+            <view class="actions"><button class="small" bindtap="editBook" data-id="{{item.id}}" disabled="{{busy}}">编辑</button><button class="small danger" data-id="{{item.id}}" data-action="removeBook" bindtap="act" disabled="{{busy}}">删除</button></view>
+          </block>
+          <block wx:if="{{panel === 'borrows'}}">
+            <view class="row"><text class="badge">{{item.statusLabel}}</text><text class="muted code">{{item.code}}</text></view><view class="record-title">{{item.bookTitle}}</view><view>{{item.name}} · {{item.phone}}</view><view class="hint">借阅：{{item.borrowDate}}<view>到期：{{item.dueDate}}</view><view wx:if="{{item.returnDate}}">归还：{{item.returnDate}}</view></view>
+            <button wx:if="{{item.status === 'borrowed'}}" class="primary small" data-id="{{item.id}}" data-action="returnBorrow" bindtap="act" disabled="{{busy}}">确认已归还</button>
+          </block>
+          <block wx:if="{{panel === 'reviews'}}">
+            <view class="row"><text class="badge">{{item.statusLabel}}</text><text class="muted">{{item.rating}} / 5 星</text></view><view class="record-title">{{item.bookTitle}}</view><view class="muted">{{item.name}} · {{item.phone}}</view><view class="review-content body-text">{{item.content}}</view>
+            <view wx:if="{{item.rejectReason}}" class="notice">修改建议：{{item.rejectReason}}</view>
+            <view class="actions"><button wx:if="{{item.status !== 'approved'}}" class="primary small" data-id="{{item.id}}" data-action="approve" bindtap="act" disabled="{{busy}}">审核通过</button><button class="small" data-id="{{item.id}}" bindtap="openReject" disabled="{{busy}}">退回修改</button><button class="danger small" data-id="{{item.id}}" data-action="removeReview" bindtap="act" disabled="{{busy}}">删除</button></view>
+            <view wx:if="{{rejectId === item.id}}" class="reject-form"><view class="label">修改建议 / 未通过原因</view><textarea value="{{rejectReason}}" bindinput="rejectInput" maxlength="500" placeholder="向读者说明需要调整的内容" /><view class="actions"><button class="primary small" bindtap="rejectReview" loading="{{busy}}" disabled="{{busy}}">提交</button><button class="ghost small" bindtap="closeReject" disabled="{{busy}}">收起</button></view></view>
+          </block>
+          <block wx:if="{{panel === 'rooms'}}">
+            <view class="row"><text class="badge">{{item.statusLabel}}</text><text class="muted code">{{item.code}}</text></view><view class="record-title">{{item.purpose}}</view><view>{{item.date}} {{item.timeSlot}} · {{item.duration}} 小时</view><view class="hint">{{item.name}} · {{item.phone}} · {{item.attendees}} 人</view>
+            <view class="actions"><button wx:if="{{item.status === 'upcoming'}}" class="danger small" data-id="{{item.id}}" data-action="cancelRoom" bindtap="act" disabled="{{busy}}">取消预约</button><button wx:if="{{item.volunteerImage || item.volunteerNote}}" class="small" data-id="{{item.id}}" bindtap="openMaterial">查看志愿材料</button></view>
+          </block>
+        </view>
+      </view>
+    </block>
+    <block wx:if="{{panel === 'slots'}}">
+      <view class="split">
+        <view class="card">
+          <view class="subtitle">开放时段设置</view><view class="muted">选择日期后勾选可预约时段；不勾选表示当日不开放。</view>
+          <view class="field"><label class="label">日期</label><picker mode="date" value="{{selectedDate}}" start="{{startDate}}" end="{{endDate}}" bindchange="chooseDate" disabled="{{busy || loading}}"><view class="picker">{{selectedDate || '选择日期'}}　⌄</view></picker></view>
+          <checkbox-group bindchange="changeSlots" class="slot-options"><label wx:for="{{slotOptions}}" wx:key="time" class="slot-option {{item.checked ? 'selected' : ''}}"><checkbox value="{{item.time}}" checked="{{item.checked}}" disabled="{{busy || loading}}" color="#315e46" />{{item.time}}</label></checkbox-group>
+          <view class="range-setting"><switch checked="{{applyToRange}}" bindchange="rangeChange" disabled="{{busy}}" color="#315e46" /><view>应用到全部可预约日期<view class="muted">{{startDate}} 至 {{endDate}}</view></view></view>
+          <view class="hint">关闭时段不会自动取消已有预约。需要取消时，请在「预约」面板中操作。</view>
+          <button class="primary" bindtap="saveSlots" loading="{{busy}}" disabled="{{busy || loading || !selectedDate}}">保存开放时段</button>
+        </view>
+        <view class="card">
+          <view class="subtitle">{{selectedDate}} 占用情况</view><view class="slot-statuses"><view wx:for="{{daySlots}}" wx:key="time" class="slot-state {{item.status}}"><view>{{item.time}}</view><text>{{item.label}}</text></view></view>
+          <view class="section"><view class="label">当日预约</view><view wx:if="{{!dayBookings.length}}" class="empty">暂无有效预约</view><view wx:for="{{dayBookings}}" wx:key="id" class="day-booking"><view>{{item.timeSlot}} · {{item.duration}} 小时 · {{item.purpose}}</view><view class="muted">{{item.name}} · {{item.phone}} · {{item.attendees}} 人</view></view></view>
+        </view>
+      </view>
+      <view class="section card"><view class="subtitle">未来开放概况</view><view class="date-grid"><button wx:for="{{slotDays}}" wx:key="date" class="date-button {{selectedDate === item.date ? 'primary' : ''}}" data-date="{{item.date}}" bindtap="chooseDate" disabled="{{busy || loading}}"><view>{{item.displayMonth}}/{{item.displayDay}} {{item.weekday}}</view><view>{{item.openCount}} 个时段</view></button></view></view>
+    </block>
+  </block>
+  <view wx:if="{{material}}" class="material-overlay">
+    <scroll-view scroll-y class="material-card">
+      <view class="row"><view class="subtitle">志愿服务材料</view><button class="ghost small" bindtap="closeMaterial">关闭</button></view><view>{{material.name}} · {{material.date}}</view><view class="hint">预约编号：{{material.code}}</view><view class="body-text">{{material.volunteerNote || '未填写说明'}}</view><image wx:if="{{material.imageUrl}}" class="photo material-image" src="{{material.imageUrl}}" mode="widthFix" data-url="{{material.imageUrl}}" bindtap="preview" /><view class="hint">点击照片放大查看</view>
+    </scroll-view>
+  </view>
+</view>

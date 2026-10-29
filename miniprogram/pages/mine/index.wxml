@@ -1,0 +1,67 @@
+<view class="page">
+  <view class="eyebrow">YOUR READING & GARDEN DAYS</view><view class="title">我的记录</view>
+  <view class="muted">借阅、读后感与相聚时光，都在这里。</view>
+  <view class="card section">
+    <view class="label">使用预约或借阅时填写的手机号查询</view>
+    <view class="query-row"><input value="{{phone}}" bindinput="phoneInput" bindconfirm="query" type="number" maxlength="11" disabled="{{busy}}" placeholder="11 位手机号" confirm-type="search" /><button class="primary" bindtap="query" disabled="{{busy || loading}}" loading="{{loading}}">查询记录</button></view>
+    <checkbox-group bindchange="consent"><label class="check"><checkbox value="yes" checked="{{accepted}}" disabled="{{busy}}" /><view>同意使用手机号查询记录，并在本机保存用于下次填写。</view></label></checkbox-group>
+    <view class="hint"><text class="link" bindtap="privacy">阅读隐私说明</text></view>
+  </view>
+  <view class="tabs">
+    <button class="{{kind === 'borrows' ? 'active' : ''}}" data-kind="borrows" bindtap="kindTap" disabled="{{busy}}">图书借阅</button>
+    <button class="{{kind === 'rooms' ? 'active' : ''}}" data-kind="rooms" bindtap="kindTap" disabled="{{busy}}">活动室预约</button>
+    <button class="{{kind === 'reviews' ? 'active' : ''}}" data-kind="reviews" bindtap="kindTap" disabled="{{busy}}">我的读后感</button>
+  </view>
+  <view wx:if="{{kind !== 'reviews'}}" class="tabs subtabs">
+    <button class="{{period === 'active' ? 'active' : ''}}" data-period="active" bindtap="periodTap" disabled="{{busy}}">{{kind === 'borrows' ? '借阅中' : '当前预约'}}</button>
+    <button class="{{period === 'history' ? 'active' : ''}}" data-period="history" bindtap="periodTap" disabled="{{busy}}">历史记录</button>
+  </view>
+  <view wx:if="{{!queried}}" class="empty">填写手机号并查询，查看你的记录。</view>
+  <view wx:elif="{{loading}}" class="notice">正在查询记录…</view>
+  <view wx:elif="{{error}}" class="notice error">{{error}}<button class="small ghost" bindtap="load">重新加载</button></view>
+  <view wx:elif="{{!records.length}}" class="empty">这里还没有记录。</view>
+  <view class="grid">
+    <view wx:for="{{records}}" wx:key="id" class="card record">
+      <view class="row"><text class="badge {{item.overdue ? 'overdue' : ''}}">{{item.statusLabel}}</text><text wx:if="{{item.code}}" class="code">{{item.code}}</text></view>
+      <block wx:if="{{kind === 'borrows'}}">
+        <view class="record-title record-heading">{{item.bookTitle}}</view><view class="muted">{{item.author}}</view>
+        <view class="record-line">借阅日期：{{item.borrowDate}}</view><view class="record-line">应还日期：{{item.dueDate}}</view>
+        <view wx:if="{{item.returnDate}}" class="record-line">归还日期：{{item.returnDate}}</view>
+        <view wx:if="{{item.renewed}}" class="hint">已续借一次</view>
+        <view class="actions">
+          <button wx:if="{{item.status === 'borrowed'}}" class="small primary" data-id="{{item.id}}" data-action="return" bindtap="action" disabled="{{busy || loading}}">归还登记</button>
+          <button wx:if="{{item.status === 'borrowed' && !item.renewed}}" class="small" data-id="{{item.id}}" data-action="renew" bindtap="action" disabled="{{busy || loading}}">续借 30 天</button>
+          <button class="small ghost" data-book-id="{{item.bookId}}" bindtap="review" disabled="{{busy || loading}}">写读后感</button>
+          <button class="small ghost" data-book-id="{{item.bookId}}" bindtap="book" disabled="{{busy}}">图书详情</button>
+        </view>
+      </block>
+      <block wx:elif="{{kind === 'rooms'}}">
+        <view class="record-title record-heading">{{item.purpose}}</view>
+        <view class="record-line">{{item.date}}　{{item.timeSlot}} · {{item.duration}} 小时</view><view class="record-line">{{item.attendees}} 人 · {{item.name}}</view>
+        <view wx:if="{{item.status === 'upcoming' && !item.canCheckout}}" class="hint">活动开始后可提交志愿服务材料签退。</view>
+        <view wx:if="{{item.canCheckout}}" class="hint">待提交志愿服务材料完成签退。</view>
+        <view wx:if="{{item.volunteerNote}}" class="notice body-text">{{item.volunteerNote}}</view>
+        <image wx:if="{{item.imageUrl}}" class="record-photo photo" src="{{item.imageUrl}}" mode="aspectFill" data-url="{{item.imageUrl}}" bindtap="preview" lazy-load />
+        <view class="actions">
+          <button wx:if="{{item.canCheckout}}" class="small primary" data-id="{{item.id}}" bindtap="checkout" disabled="{{busy || loading}}">提交材料 / 签退</button>
+          <button wx:if="{{item.canCancel}}" class="small danger" data-id="{{item.id}}" data-action="cancel" bindtap="action" disabled="{{busy || loading}}">取消预约</button>
+        </view>
+      </block>
+      <block wx:else>
+        <view class="record-title record-heading">{{item.bookTitle}}</view>
+        <view class="rating">评分 {{item.rating}} / 5</view><view class="body-text">{{item.content}}</view>
+        <view wx:if="{{item.rejectReason}}" class="notice error">修改建议：{{item.rejectReason}}</view>
+        <view class="hint">{{item.updatedAt}}</view>
+        <view class="actions">
+          <button class="small" data-id="{{item.id}}" data-book-id="{{item.bookId}}" bindtap="review" disabled="{{busy || loading}}">编辑读后感</button>
+          <button class="small danger" data-id="{{item.id}}" data-action="delete" bindtap="action" disabled="{{busy || loading}}">删除</button>
+          <button class="small ghost" data-book-id="{{item.bookId}}" bindtap="book" disabled="{{busy}}">图书详情</button>
+        </view>
+      </block>
+    </view>
+  </view>
+  <view class="section card">
+    <view class="subtitle">个人信息与管理</view>
+    <view class="actions"><button class="small ghost" bindtap="privacy">隐私说明</button><button class="small ghost" bindtap="clearLocal" disabled="{{busy}}">清空本机信息</button><button class="small ghost" bindtap="admin">管理员入口</button></view>
+  </view>
+</view>

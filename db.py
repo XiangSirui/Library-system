@@ -6,9 +6,10 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 import random
 import string
+import uuid
 from werkzeug.security import generate_password_hash, check_password_hash
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'library.db')
+DB_PATH = os.environ.get('LIBRARY_DB_PATH') or os.path.join(os.path.dirname(__file__), 'library.db')
 
 BORROW_DAYS = 30
 MAX_BORROWS = 3
@@ -356,6 +357,8 @@ def row_to_borrow(row):
 
 
 def list_borrows(phone='', tab='active'):
+    if not phone:
+        return []
     with get_db() as conn:
         query = 'SELECT * FROM borrows WHERE 1=1'
         params = []
@@ -373,6 +376,7 @@ def list_borrows(phone='', tab='active'):
 
 def create_borrow(book_id, name, phone, card=''):
     with get_db() as conn:
+        conn.execute('BEGIN IMMEDIATE')
         book = conn.execute('SELECT * FROM books WHERE id = ?', (book_id,)).fetchone()
         if not book:
             return None, '图书不存在'
@@ -394,7 +398,7 @@ def create_borrow(book_id, name, phone, card=''):
         now = datetime.now()
         borrow_date = format_date(now)
         due_date = format_date(now + timedelta(days=BORROW_DAYS))
-        record_id = str(int(now.timestamp() * 1000))
+        record_id = uuid.uuid4().hex
         code = generate_code('JY')
 
         conn.execute(
@@ -411,11 +415,13 @@ def create_borrow(book_id, name, phone, card=''):
         return row_to_borrow(row), None
 
 
-def return_borrow(borrow_id):
+def return_borrow(borrow_id, phone=''):
     with get_db() as conn:
         row = conn.execute('SELECT * FROM borrows WHERE id = ?', (borrow_id,)).fetchone()
         if not row:
             return None, '借阅记录不存在'
+        if phone and row['phone'] != phone:
+            return None, '手机号与记录不匹配'
         if row['status'] != 'borrowed':
             return None, '该图书已归还'
         return_date = format_date(datetime.now())
@@ -427,11 +433,13 @@ def return_borrow(borrow_id):
         return row_to_borrow(updated), None
 
 
-def renew_borrow(borrow_id):
+def renew_borrow(borrow_id, phone=''):
     with get_db() as conn:
         row = conn.execute('SELECT * FROM borrows WHERE id = ?', (borrow_id,)).fetchone()
         if not row:
             return None, '借阅记录不存在'
+        if phone and row['phone'] != phone:
+            return None, '手机号与记录不匹配'
         if row['status'] != 'borrowed':
             return None, '该图书已归还'
         if row['renewed']:
@@ -530,8 +538,8 @@ def set_default_open_slots(open_slots):
 
 def get_day_slot_settings(date):
     """管理员：某日时段开放状态"""
-    if not date:
-        return None, '缺少日期'
+    if not valid_date(date):
+        return None, '请输入 YYYY-MM-DD 格式的有效日期'
     open_slots = get_open_time_slots(date)
     open_set = set(open_slots)
     with get_db() as conn:
@@ -549,8 +557,8 @@ def get_day_slot_settings(date):
 
 def set_day_open_slots(date, open_slots, apply_to_range=False):
     """管理员：设置某日开放时段；可选同步到未来可预约范围内所有日期"""
-    if not date:
-        return None, '缺少日期'
+    if not valid_date(date):
+        return None, '请输入 YYYY-MM-DD 格式的有效日期'
     selected, err = _normalize_open_slots(open_slots)
     if err:
         return None, err
@@ -725,6 +733,8 @@ def get_room_calendar(days=BOOKING_DAYS, include_details=False, include_closed=F
 
 
 def list_room_bookings(phone='', tab='upcoming'):
+    if not phone:
+        return []
     with get_db() as conn:
         query = "SELECT * FROM room_bookings WHERE 1=1"
         params = []
@@ -752,7 +762,27 @@ def list_room_bookings(phone='', tab='upcoming'):
         return results
 
 
+def valid_date(value):
+    try:
+        parsed = datetime.strptime(value, '%Y-%m-%d')
+        return parsed.strftime('%Y-%m-%d') == value
+    except (ValueError, TypeError):
+        return False
+
+
 def create_room_booking(date, time_slot, duration, purpose, name, phone, attendees):
+    if not valid_date(date) or time_slot not in ALL_TIME_SLOTS:
+        return None, '预约日期或时段无效'
+    if not isinstance(duration, int) or isinstance(duration, bool) or not 1 <= duration <= 3:
+        return None, '使用时长须为 1–3 小时'
+    if not isinstance(attendees, int) or isinstance(attendees, bool) or not 1 <= attendees <= 30:
+        return None, '预计人数须为 1–30 人'
+    now = datetime.now()
+    start = datetime.strptime(f'{date}T{time_slot}', '%Y-%m-%dT%H:%M')
+    if start <= now:
+        return None, '该时段已开始，请选择未来时段'
+    if start.date() > (now + timedelta(days=BOOKING_DAYS)).date():
+        return None, f'仅可预约未来 {BOOKING_DAYS} 天内的时段'
     open_slots = set(get_open_time_slots(date))
     if time_slot not in open_slots:
         return None, '该时段未开放预约'
@@ -769,6 +799,7 @@ def create_room_booking(date, time_slot, duration, purpose, name, phone, attende
         return None, '超出闭馆时间'
 
     with get_db() as conn:
+        conn.execute('BEGIN IMMEDIATE')
         occupied = _occupied_slots_from_conn(conn, date)
         for slot in needed:
             if slot in occupied:
@@ -782,7 +813,7 @@ def create_room_booking(date, time_slot, duration, purpose, name, phone, attende
             return None, '每人每日最多预约活动室 1 次'
 
         now = datetime.now()
-        record_id = str(int(now.timestamp() * 1000))
+        record_id = uuid.uuid4().hex
         code = generate_code('HD')
 
         conn.execute(
@@ -798,53 +829,60 @@ def create_room_booking(date, time_slot, duration, purpose, name, phone, attende
         return row_to_room_booking(row), None
 
 
-def checkout_room_booking(booking_id, volunteer_note='', volunteer_image='', phone=''):
-    """签退：提交志愿服务照片与说明，状态改为 checked_out"""
-    note = (volunteer_note or '').strip()
-    image = (volunteer_image or '').strip()
-    if not note:
-        return None, '请填写社区花园志愿服务说明'
-    if not image:
-        return None, '请上传社区花园志愿服务照片'
-    if len(note) < 5:
-        return None, '志愿服务说明请至少填写 5 个字'
+def _room_checkout_error(row, note, phone):
+    if not note or len(note) < 5:
+        return '志愿服务说明请至少填写 5 个字'
+    if len(note) > 2000:
+        return '志愿服务说明请勿超过 2000 字'
+    if not row:
+        return '预约记录不存在'
+    if row['status'] != 'upcoming':
+        return '该预约已取消或已签退'
+    if phone and row['phone'] != phone:
+        return '手机号与预约记录不匹配'
+    start = datetime.strptime(f"{row['date']}T{row['time_slot']}", '%Y-%m-%dT%H:%M')
+    if datetime.now() < start:
+        return '活动开始后方可签退'
+    return None
 
+
+def validate_room_checkout(booking_id, volunteer_note='', phone=''):
     with get_db() as conn:
         row = conn.execute('SELECT * FROM room_bookings WHERE id = ?', (booking_id,)).fetchone()
-        if not row:
-            return None, '预约记录不存在'
-        if row['status'] == 'cancelled':
-            return None, '该预约已取消，无法签退'
-        if row['status'] == 'checked_out':
-            return None, '该预约已签退'
-        if row['status'] != 'upcoming':
-            return None, '当前状态不可签退'
-        if phone and row['phone'] != phone:
-            return None, '手机号与预约记录不匹配'
+        return _room_checkout_error(row, volunteer_note.strip(), phone)
 
-        start = datetime.strptime(f"{row['date']}T{row['time_slot']}", '%Y-%m-%dT%H:%M')
-        if datetime.now() < start:
-            return None, '活动开始后方可签退'
 
+def checkout_room_booking(booking_id, volunteer_note='', volunteer_image='', phone=''):
+    """签退：提交志愿服务照片与说明，状态改为 checked_out。"""
+    note = (volunteer_note or '').strip()
+    image = (volunteer_image or '').strip()
+    if not image:
+        return None, '请上传社区花园志愿服务照片'
+    with get_db() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        row = conn.execute('SELECT * FROM room_bookings WHERE id = ?', (booking_id,)).fetchone()
+        err = _room_checkout_error(row, note, phone)
+        if err:
+            return None, err
         now = datetime.now()
         conn.execute(
-            '''UPDATE room_bookings
-               SET status = 'checked_out',
-                   volunteer_note = ?,
-                   volunteer_image = ?,
-                   checkout_at = ?
-               WHERE id = ?''',
+            """UPDATE room_bookings
+               SET status = 'checked_out', volunteer_note = ?,
+                   volunteer_image = ?, checkout_at = ?
+               WHERE id = ?""",
             (note, image, now.isoformat(), booking_id)
         )
         updated = conn.execute('SELECT * FROM room_bookings WHERE id = ?', (booking_id,)).fetchone()
         return row_to_room_booking(updated), None
 
 
-def cancel_room_booking(booking_id):
+def cancel_room_booking(booking_id, phone=''):
     with get_db() as conn:
         row = conn.execute('SELECT * FROM room_bookings WHERE id = ?', (booking_id,)).fetchone()
         if not row:
             return None, '预约记录不存在'
+        if phone and row['phone'] != phone:
+            return None, '手机号与记录不匹配'
         if row['status'] != 'upcoming':
             return None, '仅未签退的有效预约可取消'
         booking_time = datetime.strptime(f"{row['date']}T{row['time_slot']}", '%Y-%m-%dT%H:%M')
@@ -1049,7 +1087,7 @@ def create_book(data):
     author = (data.get('author') or '').strip()
     category = (data.get('category') or '').strip()
     isbn = (data.get('isbn') or '').strip()
-    copies = int(data.get('copies') or 1)
+    copies = int(data.get('copies') if data.get('copies') is not None else 1)
     cover_isbn = (data.get('coverIsbn') or isbn.replace('-', '')).strip()
 
     if not title or not author or not category:

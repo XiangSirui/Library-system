@@ -1,0 +1,32 @@
+<view class="page">
+  <view class="eyebrow">CARE FOR OUR SHARED GARDEN</view><view class="title">活动室签退</view>
+  <view class="muted">记录一次照料，让共同的花园继续生长。</view>
+  <view wx:if="{{loading}}" class="notice">正在确认预约状态…</view>
+  <view wx:if="{{error}}" class="notice error">{{error}}<view class="actions"><button class="small ghost" bindtap="load">重新加载</button><button class="small ghost" bindtap="records">返回我的记录</button></view></view>
+  <view wx:if="{{completed}}" class="card section">
+    <view class="subtitle">感谢你的照料，签退已完成</view>
+    <view>你的志愿服务材料已保存，管理员可查看本次服务说明和照片。</view>
+    <view class="actions"><button class="primary" bindtap="records">返回我的记录</button></view>
+  </view>
+  <view wx:elif="{{record && !error}}" class="split section">
+    <view class="card">
+      <view class="subtitle">{{record.purpose}}</view><view class="badge">社区共享活动室</view>
+      <view class="details">{{record.date}}　{{record.timeSlot}}<view>{{record.duration}} 小时 · {{record.attendees}} 人</view><view>预约码：<text class="code" selectable>{{record.code}}</text></view></view>
+      <view class="notice">请上传本人在社区花园开展志愿服务的照片，并写明服务内容、时间与地点。请避免包含他人的无关个人信息。</view>
+      <view class="hint">照片在提交前仅供本机预览；确认签退后才会上传到社区服务端。</view>
+    </view>
+    <view class="card">
+      <view class="field">
+        <view class="label">社区花园志愿服务照片</view>
+        <image wx:if="{{imagePath}}" class="checkout-photo photo" src="{{imagePath}}" mode="aspectFill" bindtap="preview" />
+        <view wx:if="{{imageSize}}" class="hint">{{imageSize}} · 点击照片可预览</view>
+        <button class="ghost" bindtap="choose" loading="{{choosing}}" disabled="{{busy || choosing}}">{{imagePath ? '重新选择照片' : '拍照或从相册选择'}}</button>
+        <view class="hint">JPG / PNG / WEBP / GIF，照片小于 4.5 MB。</view>
+      </view>
+      <view class="field"><view class="label">志愿服务说明</view><textarea value="{{form.volunteerNote}}" data-field="volunteerNote" bindinput="input" disabled="{{busy}}" maxlength="1000" placeholder="例如：今天在社区花园参与浇水、除草和整理花池，服务约半小时。至少 5 个字。" /></view>
+      <checkbox-group bindchange="consent"><label class="check"><checkbox value="yes" checked="{{accepted}}" disabled="{{busy}}" /><view>同意提交志愿服务照片、说明与预约关联信息，用于本次签退及管理员核验。</view></label></checkbox-group>
+      <view class="hint"><text class="link" bindtap="privacy">阅读隐私说明</text></view>
+      <button class="primary" bindtap="submit" loading="{{busy}}" disabled="{{busy || choosing || loading}}">确认签退</button>
+    </view>
+  </view>
+</view>

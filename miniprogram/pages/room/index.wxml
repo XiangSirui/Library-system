@@ -1,0 +1,51 @@
+<view class="page">
+  <view class="eyebrow">A SPACE TO GATHER</view>
+  <view class="title">邻里相聚，自然发生</view>
+  <view class="muted">社区共享活动室 · 最多 30 人 · 08:00—20:00</view>
+  <view class="wrap facilities"><text class="badge">投影仪</text><text class="badge">音响系统</text><text class="badge">白板</text><text class="badge">活动桌椅</text><text class="badge">免费 WiFi</text></view>
+  <view class="notice">可预约今天起未来 14 天的开放时段，每人每日限 1 次。取消请至少提前 1 小时；使用后请提交花园志愿服务照片和说明完成签退。</view>
+  <view wx:if="{{result}}" class="card success-card">
+    <view class="subtitle">预约成功</view><view>预约码：<text class="code" selectable>{{result.code}}</text></view>
+    <view>{{result.date}} {{result.timeSlot}} · {{result.duration}} 小时</view>
+    <view class="actions"><button class="primary" bindtap="records">查看我的预约</button></view>
+  </view>
+  <view wx:if="{{loading}}" class="notice">正在更新开放时段…</view>
+  <view wx:if="{{error}}" class="notice error">{{error}}<button class="small ghost" bindtap="load">重新加载</button></view>
+  <view class="split section">
+    <view class="card">
+      <view class="subtitle">选择日期与时段</view>
+      <view class="date-grid">
+        <button wx:for="{{days}}" wx:key="date" class="date-button {{date === item.date ? 'selected' : ''}}" data-date="{{item.date}}" bindtap="dateTap" disabled="{{busy}}">
+          <view class="day-week">{{item.isToday ? '今天' : item.weekday}}</view><view class="day-date">{{item.displayMonth}} / {{item.displayDay}}</view><view class="day-count">{{item.freeSlots > 0 ? item.freeSlots + ' 个空闲' : '暂无空闲'}}</view>
+        </button>
+      </view>
+      <view wx:if="{{!days.length && !loading && !error}}" class="empty">暂无可预约日期，请稍后再来。</view>
+      <view wx:if="{{date}}" class="selected-date">{{date}} {{weekday}}</view>
+      <view class="slot-grid">
+        <button wx:for="{{slots}}" wx:key="time" class="slot {{item.status}} {{timeSlot === item.time ? 'selected' : ''}}" data-time="{{item.time}}" bindtap="slotTap" disabled="{{busy || item.status !== 'free'}}">
+          <view>{{item.time}}</view><view class="slot-label">{{item.label}}</view>
+        </button>
+      </view>
+      <view class="hint">绿色时段可选；灰色时段已结束、未开放或已被预约。</view>
+    </view>
+    <view class="card">
+      <view class="subtitle">预约信息</view>
+      <view wx:if="{{timeSlot}}" class="notice">{{date}}　{{timeSlot}}—{{endTime}}</view>
+      <view wx:else class="notice">请先在日历中选择一个空闲时段。</view>
+      <view class="field">
+        <view class="label">使用时长</view>
+        <picker range="{{durationLabels}}" value="{{durationIndex}}" bindchange="durationChange" disabled="{{!timeSlot || busy}}"><view class="picker">{{duration ? duration + ' 小时' : '选择开始时段后设置'}}</view></picker>
+        <view class="hint">只显示连续空闲的时长，最多 3 小时。</view>
+      </view>
+      <view class="field"><view class="label">活动用途</view><input value="{{form.purpose}}" data-field="purpose" bindinput="input" disabled="{{busy}}" maxlength="100" placeholder="如：读书分享会、社区讲座" /></view>
+      <view class="form-row">
+        <view class="field"><view class="label">联系人</view><input value="{{form.name}}" data-field="name" bindinput="input" disabled="{{busy}}" maxlength="30" placeholder="姓名" /></view>
+        <view class="field"><view class="label">手机号</view><input value="{{form.phone}}" data-field="phone" bindinput="input" disabled="{{busy}}" type="number" maxlength="11" placeholder="11 位手机号" /></view>
+      </view>
+      <view class="field"><view class="label">预计人数</view><input value="{{form.attendees}}" data-field="attendees" bindinput="input" disabled="{{busy}}" type="number" maxlength="2" placeholder="1–30 人" /></view>
+      <checkbox-group bindchange="consent"><label class="check"><checkbox value="yes" checked="{{accepted}}" disabled="{{busy}}" /><view>同意为本次预约使用联系信息，并在本机保存用于下次填写。</view></label></checkbox-group>
+      <view class="hint"><text class="link" bindtap="privacy">阅读隐私说明</text></view>
+      <button class="primary" bindtap="submit" loading="{{busy}}" disabled="{{busy || loading || !timeSlot || !duration || !!error}}">确认预约</button>
+    </view>
+  </view>
+</view>

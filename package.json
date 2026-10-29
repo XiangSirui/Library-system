@@ -1,0 +1,14 @@
+{
+  "name": "yuexiang-miniprogram",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Native WeChat client for the Yuexiang community garden and library",
+  "scripts": {
+    "check": "node scripts/check_miniprogram.js",
+    "test": "node --test tests/miniprogram.test.js",
+    "compile": "node scripts/compile_miniprogram.js"
+  },
+  "devDependencies": {
+    "miniprogram-compiler": "0.2.3"
+  }
+}

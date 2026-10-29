@@ -1,0 +1,22 @@
+<view class="page">
+  <view class="eyebrow">LIBRARY COLLECTION</view><view class="title">{{id ? '编辑图书' : '添加一本好书'}}</view>
+  <view wx:if="{{loading}}" class="notice">正在加载…</view>
+  <view wx:if="{{error}}" class="notice error">{{error}}<view class="actions"><button class="ghost small" bindtap="load">重新加载</button><button class="small" bindtap="back">返回管理页</button></view></view>
+  <form wx:if="{{!loading && !error && authenticated}}" class="split book-form" bindsubmit="save">
+    <view class="card">
+      <view class="subtitle">图书信息</view>
+      <view class="field"><label class="label">书名 *</label><input value="{{form.title}}" data-field="title" bindinput="input" maxlength="120" placeholder="请输入书名" /></view>
+      <view class="field"><label class="label">作者 *</label><input value="{{form.author}}" data-field="author" bindinput="input" maxlength="100" placeholder="请输入作者" /></view>
+      <view class="field"><label class="label">分类 *</label><picker range="{{categories}}" value="{{categoryIndex}}" bindchange="categoryChange"><view class="picker">{{form.category}}　⌄</view></picker></view>
+      <view class="field"><label class="label">ISBN</label><input value="{{form.isbn}}" data-field="isbn" bindinput="input" maxlength="32" placeholder="选填，可保留连字符" /></view>
+    </view>
+    <view class="card">
+      <view class="subtitle">馆藏与封面</view>
+      <view class="field"><label class="label">馆藏册数 *</label><input value="{{form.copies}}" data-field="copies" bindinput="input" type="number" maxlength="8" placeholder="至少 1 册" /></view>
+      <view wx:if="{{id}}" class="hint">当前已借出 {{borrowed}} 本，馆藏册数不能低于此数量。</view>
+      <view class="field"><label class="label">封面 ISBN</label><input value="{{form.coverIsbn}}" data-field="coverIsbn" bindinput="input" maxlength="32" placeholder="选填，用于匹配对应版本的封面" /></view>
+      <view class="notice">修改书名与作者后，借阅记录中的对应信息也会同步更新。</view>
+      <button class="primary" form-type="submit" disabled="{{busy}}" loading="{{busy}}">{{id ? '保存修改' : '添加图书'}}</button><button class="ghost cancel" bindtap="back" disabled="{{busy}}">返回管理页</button>
+    </view>
+  </form>
+</view>

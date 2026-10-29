@@ -1,0 +1,1 @@
+.detail-cover { max-width: 300px; min-height: 260px; padding: 28px; } .detail-cover .cover-title { font-size: 32px; } .mine-button { margin-top: 12px; } .review-content { margin: 14px 0; }

@@ -1,0 +1,37 @@
+{
+  "pages": [
+    "pages/garden/index",
+    "pages/books/index",
+    "pages/room/index",
+    "pages/mine/index",
+    "pages/book/index",
+    "pages/review/index",
+    "pages/checkout/index",
+    "pages/admin/index",
+    "pages/admin-book/index",
+    "pages/privacy/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "阅享空间",
+    "navigationBarBackgroundColor": "#f6f4ed",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f6f4ed",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#727b70",
+    "selectedColor": "#315e46",
+    "backgroundColor": "#fffefa",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/garden/index", "text": "花园", "iconPath": "assets/garden.png", "selectedIconPath": "assets/garden-active.png" },
+      { "pagePath": "pages/books/index", "text": "借书", "iconPath": "assets/books.png", "selectedIconPath": "assets/books-active.png" },
+      { "pagePath": "pages/room/index", "text": "活动室", "iconPath": "assets/room.png", "selectedIconPath": "assets/room-active.png" },
+      { "pagePath": "pages/mine/index", "text": "我的", "iconPath": "assets/mine.png", "selectedIconPath": "assets/mine-active.png" }
+    ]
+  },
+  "resizable": true,
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
+  "sitemapLocation": "sitemap.json"
+}

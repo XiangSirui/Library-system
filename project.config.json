@@ -1,0 +1,15 @@
+{
+  "description": "阅享空间 · 社区花园与共享图书馆",
+  "miniprogramRoot": "miniprogram/",
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "Yuexiang-MiniProgram",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "enhance": true
+  },
+  "condition": {}
+}

@@ -1,0 +1,32 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="notice">正在加载图书信息…</view>
+  <view wx:if="{{error}}" class="notice error">{{error}}<button bindtap="load" class="small ghost">重新加载</button></view>
+  <block wx:if="{{book}}">
+    <view class="split">
+      <view>
+        <view class="eyebrow">A BOOK TO TAKE HOME</view>
+        <view class="cover detail-cover"><view class="badge">{{book.category}}</view><view class="cover-title">{{book.title}}</view><view>{{book.author}}</view></view>
+        <view class="section"><view class="title">{{book.title}}</view><view>{{book.author}} · {{book.category}}</view><view class="muted">ISBN：{{book.isbn || '暂无'}}</view></view>
+        <view class="notice">馆藏 {{book.copies}} 本 · 当前可借 {{book.available}} 本<view>借期 30 天，每人同时最多借阅 3 本，可续借一次。</view></view>
+      </view>
+      <view class="card">
+        <view class="subtitle">预约借阅</view><view class="muted">填写联系信息，预约后凭取书码到馆取书。</view>
+        <view class="field"><text class="label">姓名 *</text><input value="{{form.name}}" data-field="name" bindinput="input" maxlength="30" placeholder="借阅人姓名" /></view>
+        <view class="field"><text class="label">手机号 *</text><input value="{{form.phone}}" data-field="phone" bindinput="input" type="number" maxlength="11" placeholder="11 位手机号" /></view>
+        <view class="field"><text class="label">借阅证号（选填）</text><input value="{{form.card}}" data-field="card" bindinput="input" maxlength="40" placeholder="已有借阅证可填写" /></view>
+        <checkbox-group bindchange="consent"><label class="check"><checkbox value="yes" checked="{{accepted}}" color="#315e46" /><text>同意将上述信息用于本次借阅与记录查询。</text></label></checkbox-group>
+        <view class="link hint" bindtap="privacy">阅读隐私说明</view>
+        <button class="primary" bindtap="borrow" loading="{{busy}}" disabled="{{busy || !book.available || loading || !!error}}">{{book.available ? '确认借阅' : '暂时借完'}}</button>
+        <button class="ghost mine-button" bindtap="mine">查看我的借阅</button>
+      </view>
+    </view>
+    <view class="section">
+      <view class="row"><view><view class="eyebrow">READERS' NOTES</view><view class="subtitle">邻里的读后感</view></view><button class="small" bindtap="writeReview">写读后感</button></view>
+      <view class="muted">{{reviewCount}} 篇已发布{{reviewCount ? ' · 平均 ' + avgRating + ' 分' : ''}} · 借阅过本书后可发表，审核后公开</view>
+      <view wx:if="{{!reviews.length}}" class="empty">还没有公开书评，期待你的阅读分享。</view>
+      <view class="grid section">
+        <view wx:for="{{reviews}}" wx:key="id" class="card"><view class="row"><text>{{item.name}}</text><text class="badge">{{item.rating}} / 5 分</text></view><view class="body-text review-content">{{item.content}}</view><view class="muted">{{item.createdAt}}</view></view>
+      </view>
+    </view>
+  </block>
+</view>
