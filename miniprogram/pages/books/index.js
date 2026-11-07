@@ -15,5 +15,5 @@ Page({
     finally { if (sequence === this.sequence) this.setData({ loading: false }); }
   },
   openBook(event) { wx.navigateTo({ url: '/pages/book/index?id=' + encodeURIComponent(event.currentTarget.dataset.id) }); },
-  onShareAppMessage() { return { title: '科育邻里 · 把一本好书带回家', path: '/pages/books/index' }; }
+  onShareAppMessage() { return { title: '青邻兑悦 · 把一本好书带回家', path: '/pages/books/index' }; }
 });

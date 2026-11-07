@@ -1,6 +1,6 @@
 let csrfToken = '';
 /**
- * 科育邻里 · 管理后台
+ * 青邻兑悦 · 管理后台
  */
 
 const PANEL_TITLES = {

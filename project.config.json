@@ -1,9 +1,9 @@
 {
-  "description": "科育邻里 · 社区花园与共享图书馆",
+  "description": "青邻兑悦 · 社区花园与共享图书馆",
   "miniprogramRoot": "miniprogram/",
   "compileType": "miniprogram",
   "appid": "wx5ca50c732bb77aec",
-  "projectname": "Keyu-Neighborhood-MiniProgram",
+  "projectname": "Qinglin-Duiyue-MiniProgram",
   "setting": {
     "urlCheck": true,
     "es6": true,

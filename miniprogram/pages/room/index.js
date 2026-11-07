@@ -127,5 +127,5 @@ Page({
     });
   },
   records() { wx.switchTab({ url: '/pages/mine/index' }); },
-  onShareAppMessage() { return { title: '科育邻里 · 预约社区共享活动室', path: '/pages/room/index' }; }
+  onShareAppMessage() { return { title: '青邻兑悦 · 预约社区共享活动室', path: '/pages/room/index' }; }
 });

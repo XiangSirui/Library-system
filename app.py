@@ -1,4 +1,4 @@
-"""科育邻里 · Flask 本地服务端"""
+"""青邻兑悦 · Flask 本地服务端"""
 
 import os
 import uuid
@@ -642,7 +642,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = not app.config['PRODUCTION'] and os.environ.get('FLASK_DEBUG', '0') == '1'
     print('=' * 50)
-    print('  科育邻里 · 本地服务已启动')
+    print('  青邻兑悦 · 本地服务已启动')
     print(f'  浏览器打开: http://127.0.0.1:{port}')
     print('  管理: /admin/login')
     print('=' * 50)

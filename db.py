@@ -1,4 +1,4 @@
-"""科育邻里 · SQLite 数据库层"""
+"""青邻兑悦 · SQLite 数据库层"""
 
 import os
 import sqlite3

@@ -1,8 +1,8 @@
 {
-  "name": "keyu-neighborhood-miniprogram",
+  "name": "qinglin-duiyue-miniprogram",
   "version": "1.0.0",
   "private": true,
-  "description": "Native WeChat client for the Keyu neighborhood community garden and library",
+  "description": "Native WeChat client for the Qinglin Duiyue community garden and library",
   "scripts": {
     "check": "node scripts/check_miniprogram.js",
     "test": "node --test tests/miniprogram.test.js",

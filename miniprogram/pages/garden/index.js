@@ -21,5 +21,5 @@ Page({
   scroll(event) { wx.pageScrollTo({ selector: '#' + event.currentTarget.dataset.target, duration: 300 }); },
   books() { wx.switchTab({ url: '/pages/books/index' }); },
   room() { wx.switchTab({ url: '/pages/room/index' }); },
-  onShareAppMessage() { return { title: '科育邻里 · 一座由居民共同创造的花园', path: '/pages/garden/index' }; }
+  onShareAppMessage() { return { title: '青邻兑悦 · 一座由居民共同创造的花园', path: '/pages/garden/index' }; }
 });

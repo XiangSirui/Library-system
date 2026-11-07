@@ -1,5 +1,5 @@
 [Unit]
-Description=Consistent Keyu Neighborhood database and photo backup
+Description=Consistent Qinglin Duiyue database and photo backup
 Requires=docker.service
 After=docker.service
 
