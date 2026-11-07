@@ -1,6 +1,5 @@
 const api = require('../../utils/api');
 const ui = require('../../utils/ui');
-
 function decorate(items, kind) {
   const today = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
   return ui.records(items.map(item => Object.assign({}, item, {
@@ -9,47 +8,70 @@ function decorate(items, kind) {
     const start = kind === 'rooms' ? Date.parse(item.date + 'T' + item.timeSlot + ':00+08:00') : 0;
     return Object.assign({}, item, {
       canCancel: item.status === 'upcoming' && start - Date.now() >= 3600000,
-      canCheckout: item.status === 'upcoming' && start <= Date.now(),
-      imageUrl: item.volunteerImage ? api.asset(item.volunteerImage) : ''
+      canAccess: item.status === 'upcoming' && start + item.duration * 3600000 > Date.now(),
+      canCheckout: item.status === 'upcoming' && start <= Date.now()
     });
   });
 }
-
 Page({
-  data: {
-    phone: '', queriedPhone: '', kind: 'borrows', period: 'active', records: [],
-    accepted: false, loading: false, busy: false, error: '', queried: false
+  data: { user: null, phone: '', kind: 'borrows', period: 'active', records: [],
+    access: null, accepted: false, loading: false, busy: false, error: '', queried: false },
+  onShow() { this.syncUser(); if (this.data.user) this.load(); },
+  onHide() { this.closeAccess(); },
+  onUnload() { this.closeAccess(); },
+  closeAccess() {
+    clearTimeout(this.accessTimer);
+    this.accessSequence = (this.accessSequence || 0) + 1;
+    this.setData({ access: null });
   },
-  onLoad() { this.savedPhone = ui.profile().phone || ''; this.setData({ phone: this.savedPhone }); },
-  onShow() {
-    const phone = ui.profile().phone || '';
-    if (phone !== this.savedPhone) {
-      this.savedPhone = phone;
+  expireAccess() {
+    clearTimeout(this.accessTimer);
+    if (!this.data.access) return;
+    if (!api.user() || !this.data.user || api.user().id !== this.data.user.id) { this.closeAccess(); return; }
+    const remaining = Date.parse(this.data.access.expiresAt) - Date.now();
+    if (remaining <= 0) { this.closeAccess(); return; }
+    this.accessTimer = setTimeout(() => this.expireAccess(), Math.min(remaining, 60000));
+  },
+  showAccess(event) {
+    return ui.run(this, async () => {
+      this.closeAccess();
+      const sequence = this.accessSequence;
+      const id = event.currentTarget.dataset.id;
+      const record = this.data.records.find(item => item.id === id);
+      const user = api.user();
+      if (!record || !user || !this.data.user || user.id !== this.data.user.id) throw new Error('请重新登录后操作');
+      const result = await api.request('/api/room/bookings/' + encodeURIComponent(id) + '/access');
+      if (sequence !== this.accessSequence || !api.user() || api.user().id !== user.id) return;
+      if (!result.available) { wx.showModal({ title: '门锁密码', content: result.reason, showCancel: false }); return; }
+      this.setData({ access: Object.assign({}, result, { id, date: record.date, timeSlot: record.timeSlot }) }, () => wx.pageScrollTo({ selector: '#doorAccess', duration: 200 }));
+      this.expireAccess();
+    });
+  },
+  syncUser() {
+    const user = api.user();
+    if ((user && user.id) !== (this.data.user && this.data.user.id)) {
+      this.closeAccess();
       this.sequence = (this.sequence || 0) + 1;
-      this.setData({ phone, queriedPhone: '', records: [], queried: false, accepted: false, error: '', loading: false });
+      this.setData({ user, phone: '', records: [], queried: false, loading: false, error: '' });
     }
-    if (this.data.queriedPhone && this.data.phone === this.data.queriedPhone) this.load();
   },
   onPullDownRefresh() { this.load().finally(() => wx.stopPullDownRefresh()); },
-  phoneInput(event) {
-    this.sequence = (this.sequence || 0) + 1;
-    this.setData({ phone: event.detail.value, queriedPhone: '', queried: false, records: [], error: '', loading: false });
-  },
-  consent: ui.consent,
-  privacy: ui.privacy,
-  async query() {
-    if (this.data.busy) return;
-    try {
-      const phone = this.data.phone.trim();
-      if (!/^\d{11}$/.test(phone)) throw new Error('请输入 11 位手机号');
+  consent: ui.consent, privacy: ui.privacy,
+  login() {
+    return ui.run(this, async () => {
       ui.requireConsent(this.data.accepted);
-      const old = ui.profile();
-      ui.saveProfile({ phone, name: old.phone === phone ? old.name : '', card: old.phone === phone ? old.card : '' });
-      this.savedPhone = phone;
-      this.setData({ phone, queriedPhone: phone });
+      await api.login();
+      this.syncUser();
       await this.load();
-    } catch (error) { ui.errorMessage(error); }
+    });
   },
+  logout() {
+    return ui.run(this, async () => {
+      try { await api.logout(); }
+      finally { this.syncUser(); this.setData({ accepted: false }); }
+    });
+  },
+  phoneInput(event) { this.setData({ phone: event.detail.value }); },
   kindTap(event) {
     if (this.data.busy) return;
     this.setData({ kind: event.currentTarget.dataset.kind, records: [] });
@@ -61,71 +83,63 @@ Page({
     this.load();
   },
   async load() {
-    const phone = this.data.queriedPhone;
-    if (!/^\d{11}$/.test(phone) || phone !== this.data.phone.trim()) {
-      this.setData({ queried: false, records: [], loading: false });
+    this.closeAccess();
+    this.syncUser();
+    if (!this.data.user) return;
+    const sequence = this.sequence = (this.sequence || 0) + 1;
+    const phone = this.data.phone.trim();
+    if (phone && !/^[0-9]{11}$/.test(phone)) {
+      this.setData({ error: '请输入正确的 11 位手机号，或留空查看全部本人记录', records: [], queried: true, loading: false });
       return;
     }
-    const sequence = this.sequence = (this.sequence || 0) + 1;
-    const kind = this.data.kind;
-    const period = this.data.period;
+    const userId = this.data.user.id, kind = this.data.kind, period = this.data.period;
     const endpoint = kind === 'borrows' ? '/api/borrows' : kind === 'rooms' ? '/api/room/bookings' : '/api/reviews/mine';
     const tab = kind === 'rooms' ? (period === 'active' ? 'upcoming' : 'history') : period;
     this.setData({ loading: true, error: '', records: [], queried: true });
     try {
-      const records = await api.request(endpoint, 'GET', kind === 'reviews' ? { phone } : { phone, tab });
-      if (sequence === this.sequence) this.setData({ records: decorate(records, kind) });
+      const records = await api.request(endpoint, 'GET', Object.assign(kind === 'reviews' ? {} : { tab }, phone ? { phone } : {}));
+      if (sequence === this.sequence && api.user() && api.user().id === userId) this.setData({ records: decorate(records, kind) });
     } catch (error) {
       if (sequence === this.sequence) this.setData({ error: error.message, records: [] });
+      this.syncUser();
     } finally {
       if (sequence === this.sequence) this.setData({ loading: false });
     }
   },
   action(event) {
     return ui.run(this, async () => {
-      const id = String(event.currentTarget.dataset.id);
-      const action = event.currentTarget.dataset.action;
+      const id = String(event.currentTarget.dataset.id), action = event.currentTarget.dataset.action;
       const record = this.data.records.find(item => String(item.id) === id);
-      const phone = this.data.queriedPhone;
-      if (!record || !phone || phone !== this.data.phone.trim()) throw new Error('请重新查询后操作');
-      const messages = {
-        return: '请确认图书已交还到馆。确认后将完成归还登记。',
-        renew: '续借将延长 30 天，每本书限续借一次。',
-        cancel: '确认取消这次活动室预约？',
-        delete: '确认删除这篇读后感？删除后无法恢复。'
-      };
-      if (!messages[action]) return;
-      if (!(await ui.confirm(messages[action]))) return;
-      let path;
-      let method = 'POST';
-      if (action === 'return' || action === 'renew') path = '/api/borrows/' + encodeURIComponent(id) + '/' + action;
-      else if (action === 'cancel') path = '/api/room/bookings/' + encodeURIComponent(id) + '/cancel';
-      else { path = '/api/reviews/' + encodeURIComponent(id); method = 'DELETE'; }
-      await api.request(path, method, { phone });
+      const user = api.user();
+      if (!record || !user || !this.data.user || user.id !== this.data.user.id) throw new Error('请重新登录后操作');
+      const messages = { return: '请确认图书已交还到馆。确认后将完成归还登记。', renew: '续借将延长 30 天，每本书限续借一次。', cancel: '确认取消这次活动室预约？', delete: '确认删除这篇读后感？删除后无法恢复。' };
+      if (!messages[action] || !(await ui.confirm(messages[action]))) return;
+      const path = action === 'return' || action === 'renew' ? '/api/borrows/' + encodeURIComponent(id) + '/' + action
+        : action === 'cancel' ? '/api/room/bookings/' + encodeURIComponent(id) + '/cancel' : '/api/reviews/' + encodeURIComponent(id);
+      await api.request(path, action === 'delete' ? 'DELETE' : 'POST');
       await this.load();
       ui.success({ return: '归还成功', renew: '续借成功', cancel: '已取消预约', delete: '已删除' }[action]);
     });
   },
   checkout(event) {
-    const id = event.currentTarget.dataset.id;
-    const record = this.data.records.find(item => item.id === id);
-    if (!record || !record.canCheckout || this.data.busy) return;
-    wx.navigateTo({ url: '/pages/checkout/index?' + api.query({ id, phone: this.data.queriedPhone }) });
+    const record = this.data.records.find(item => item.id === event.currentTarget.dataset.id);
+    if (record && record.canCheckout && !this.data.busy) wx.navigateTo({ url: '/pages/checkout/index?id=' + encodeURIComponent(record.id) });
   },
   review(event) {
-    if (this.data.busy) return;
-    wx.navigateTo({ url: '/pages/review/index?' + api.query({ bookId: event.currentTarget.dataset.bookId, id: event.currentTarget.dataset.id || '' }) });
+    if (!this.data.busy) wx.navigateTo({ url: '/pages/review/index?' + api.query({ bookId: event.currentTarget.dataset.bookId, id: event.currentTarget.dataset.id || '' }) });
   },
   book(event) { wx.navigateTo({ url: '/pages/book/index?id=' + encodeURIComponent(event.currentTarget.dataset.bookId) }); },
-  preview: ui.preview,
+  preview(event) {
+    return ui.run(this, async () => {
+      const path = await api.downloadPhoto(event.currentTarget.dataset.path);
+      wx.previewImage({ current: path, urls: [path] });
+    });
+  },
   admin() { wx.navigateTo({ url: '/pages/admin/index' }); },
   clearLocal() {
     return ui.run(this, async () => {
-      if (!(await ui.confirm('清空本机保存的姓名、手机号和借阅证号？服务端借阅和预约记录仍会保留。'))) return;
+      if (!(await ui.confirm('清空本机保存的姓名、手机号和借阅证号？已提交的业务记录仍会保留。'))) return;
       wx.removeStorageSync('yuexiang_profile');
-      this.savedPhone = '';
-      this.sequence = (this.sequence || 0) + 1;
-      this.setData({ phone: '', queriedPhone: '', records: [], accepted: false, queried: false, error: '', loading: false });
       ui.success('已清空本机信息');
     });
   }

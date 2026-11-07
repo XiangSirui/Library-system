@@ -15,6 +15,7 @@ os.environ['LIBRARY_UPLOAD_DIR'] = str(Path(_STARTUP.name) / 'uploads')
 
 import app as server
 import db
+import identity
 from PIL import Image
 
 
@@ -31,10 +32,18 @@ class MiniProgramApiTests(unittest.TestCase):
         db.init_db()
         server.app.config.update(TESTING=True, SECRET_KEY='test-key-only')
         self.client = server.app.test_client()
+        self.member_id = identity.member_for_wechat('test-app', 'reader-A')
+        self.other_member_id = identity.member_for_wechat('test-app', 'reader-B')
+        self.token, _ = identity.issue_session('member', self.member_id)
+        self.other_token, _ = identity.issue_session('member', self.other_member_id)
+        self.client.environ_base['HTTP_AUTHORIZATION'] = 'Bearer ' + self.token
+        self.other_client = server.app.test_client()
+        self.other_client.environ_base['HTTP_AUTHORIZATION'] = 'Bearer ' + self.other_token
         self.tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
 
     def borrow(self, book_id='b1', phone=None):
-        response = self.client.post('/api/borrows', json={
+        client = self.other_client if phone and phone != self.phone else self.client
+        response = client.post('/api/borrows', json={
             'bookId': book_id, 'name': '测试读者', 'phone': phone or self.phone, 'card': 'TEST',
         })
         self.assertEqual(response.status_code, 201, response.get_json())
@@ -43,6 +52,7 @@ class MiniProgramApiTests(unittest.TestCase):
     def login(self):
         response = self.client.post('/api/admin/login', json={'username': 'admin', 'password': 'admin123'})
         self.assertEqual(response.status_code, 200)
+        self.client.environ_base['HTTP_X_CSRF_TOKEN'] = response.get_json()['csrfToken']
         return response
 
     def room_data(self, **changes):
@@ -92,35 +102,34 @@ class MiniProgramApiTests(unittest.TestCase):
         self.assertEqual([item['id'] for item in result], ['b1'])
         self.assertEqual(self.client.get('/api/books/no-such-book').status_code, 404)
 
-    def test_empty_personal_queries_do_not_disclose_all_records(self):
-        self.borrow()
+    def test_personal_queries_ignore_forged_phone_and_require_identity(self):
+        record = self.borrow()
         self.room()
-        self.assertEqual(self.client.get('/api/borrows').get_json(), [])
-        self.assertEqual(self.client.get('/api/room/bookings').get_json(), [])
-        for path in ('/api/borrows', '/api/room/bookings', '/api/user', '/api/reviews/mine'):
-            self.assertEqual(self.client.get(path, query_string={'phone': 'invalid'}).status_code, 400)
-        result = self.client.get('/api/borrows', query_string={'phone': self.other_phone}).get_json()
-        self.assertEqual(result, [])
+        self.assertEqual(self.client.get('/api/borrows').get_json()[0]['id'], record['id'])
+        self.assertEqual(self.other_client.get('/api/borrows', query_string={'phone': self.phone}).get_json(), [])
+        for path in ('/api/borrows', '/api/room/bookings', '/api/user', '/api/reviews/mine', '/api/reviews/eligibility?book_id=b1'):
+            self.assertEqual(server.app.test_client().get(path).status_code, 401)
+        self.assertEqual(self.client.get('/api/user?phone=' + self.other_phone).get_json(), {'id': self.member_id})
 
     def test_borrow_renew_and_return_flow(self):
         record = self.borrow()
         path = '/api/borrows/' + record['id']
         self.assertEqual(self.client.get('/api/books/b1').get_json()['available'], 2)
-        self.assertEqual(self.client.post(path + '/renew', json={'phone': self.other_phone}).status_code, 400)
+        self.assertEqual(self.other_client.post(path + '/renew', json={'phone': self.phone}).status_code, 404)
         renewed = self.client.post(path + '/renew', json={'phone': self.phone}).get_json()
         self.assertTrue(renewed['renewed'])
         old_due = datetime.strptime(record['dueDate'], '%Y-%m-%d')
         self.assertEqual(renewed['dueDate'], (old_due + timedelta(days=30)).strftime('%Y-%m-%d'))
         self.assertEqual(self.client.post(path + '/renew', json={'phone': self.phone}).status_code, 400)
-        self.assertEqual(self.client.post(path + '/return', json={'phone': self.other_phone}).status_code, 400)
+        self.assertEqual(self.other_client.post(path + '/return', json={'phone': self.phone}).status_code, 404)
         self.assertEqual(self.client.post(path + '/return', json={'phone': self.phone}).status_code, 200)
         self.assertEqual(self.client.get('/api/books/b1').get_json()['available'], 3)
         records = self.client.get('/api/borrows', query_string={'phone': self.phone, 'tab': 'history'}).get_json()
         self.assertEqual(records[0]['status'], 'returned')
 
-    def test_legacy_return_without_phone_remains_compatible(self):
+    def test_legacy_return_without_identity_is_closed(self):
         record = self.borrow()
-        self.assertEqual(self.client.post('/api/borrows/' + record['id'] + '/return').status_code, 200)
+        self.assertEqual(server.app.test_client().post('/api/borrows/' + record['id'] + '/return', json={}).status_code, 401)
 
     def test_borrow_limits_and_unique_ids(self):
         records = [self.borrow(book_id) for book_id in ('b1', 'b2', 'b3')]
@@ -145,7 +154,7 @@ class MiniProgramApiTests(unittest.TestCase):
         self.assertEqual(review['status'], 'pending')
         self.assertEqual(self.client.get('/api/books/b1/reviews').get_json()['count'], 0)
         self.login()
-        approved = self.client.post('/api/admin/reviews/' + review['id'] + '/approve').get_json()
+        approved = self.client.post('/api/admin/reviews/' + review['id'] + '/approve', json={}).get_json()
         self.assertEqual(approved['status'], 'approved')
         public = self.client.get('/api/books/b1/reviews').get_json()
         self.assertEqual(public['count'], 1)
@@ -160,8 +169,8 @@ class MiniProgramApiTests(unittest.TestCase):
         }).get_json()
         self.assertEqual(updated['status'], 'pending')
         self.assertEqual(updated['rating'], 4)
-        self.assertEqual(self.client.delete('/api/reviews/' + review['id'],
-                                           json={'phone': self.other_phone}).status_code, 400)
+        self.assertEqual(self.other_client.delete('/api/reviews/' + review['id'],
+                                           json={'phone': self.phone}).status_code, 404)
         self.assertEqual(self.client.delete('/api/reviews/' + review['id'],
                                            json={'phone': self.phone}).status_code, 200)
 
@@ -171,7 +180,7 @@ class MiniProgramApiTests(unittest.TestCase):
         self.assertNotEqual(one['id'], two['id'])
         self.assertEqual(len(self.client.get('/api/reviews/mine', query_string={'phone': self.phone}).get_json()), 2)
         self.login()
-        self.assertEqual(self.client.delete('/api/admin/reviews/' + one['id']).status_code, 200)
+        self.assertEqual(self.client.delete('/api/admin/reviews/' + one['id'], json={}).status_code, 200)
 
     def test_room_calendar_and_booking_conflict(self):
         calendar = self.client.get('/api/room/calendar').get_json()
@@ -183,8 +192,8 @@ class MiniProgramApiTests(unittest.TestCase):
         slots = self.client.get('/api/room/slots', query_string={'date': self.tomorrow}).get_json()
         self.assertIn('10:00', slots['bookedSlots'])
         self.assertIn('11:00', slots['bookedSlots'])
-        self.assertEqual(self.client.post('/api/room/bookings/' + room['id'] + '/cancel',
-                                         json={'phone': self.other_phone}).status_code, 400)
+        self.assertEqual(self.other_client.post('/api/room/bookings/' + room['id'] + '/cancel',
+                                         json={'phone': self.phone}).status_code, 404)
         self.assertEqual(self.client.post('/api/room/bookings/' + room['id'] + '/cancel',
                                          json={'phone': self.phone}).status_code, 200)
         self.room(timeSlot='10:00')
@@ -230,7 +239,7 @@ class MiniProgramApiTests(unittest.TestCase):
         self.assertEqual(self.checkout(room['id']).status_code, 400)  # future activity
         self.assertEqual(list(Path(server.UPLOAD_DIR).iterdir()), [])
         self.start_room(room)
-        self.assertEqual(self.checkout(room['id'], phone=self.other_phone).status_code, 400)
+        self.assertEqual(self.other_client.post('/api/room/bookings/' + room['id'] + '/checkout', data={'phone': self.phone}).status_code, 404)
         self.assertEqual(self.checkout(room['id'], volunteerNote='少').status_code, 400)
         self.assertEqual(self.checkout(room['id'], payload=b'not an image').status_code, 400)
         self.assertEqual(list(Path(server.UPLOAD_DIR).iterdir()), [])
@@ -271,7 +280,7 @@ class MiniProgramApiTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/room/bookings/' + room['id'] + '/cancel',
                                          json={'phone': self.phone}).status_code, 400)
         self.login()
-        response = self.client.post('/api/admin/room/bookings/' + room['id'] + '/cancel')
+        response = self.client.post('/api/admin/room/bookings/' + room['id'] + '/cancel', json={})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()['status'], 'cancelled')
 
@@ -289,9 +298,9 @@ class MiniProgramApiTests(unittest.TestCase):
         cookie = response.headers['Set-Cookie'].split(';', 1)[0]
         self.assertEqual(client.get('/api/admin/me', headers={'Cookie': cookie}).status_code, 200)
         self.assertEqual(client.get('/api/admin/stats').status_code, 401)
-        self.assertEqual(client.post('/api/admin/logout', headers={'Cookie': cookie}).status_code, 200)
+        self.assertEqual(client.post('/api/admin/logout', json={}, headers={'Cookie': cookie, 'X-CSRF-Token': response.get_json()['csrfToken']}).status_code, 200)
         self.login()
-        self.client.post('/api/admin/logout')
+        self.client.post('/api/admin/logout', json={})
         self.assertEqual(self.client.get('/api/admin/me').status_code, 401)
 
     def test_admin_book_crud_and_borrow_return(self):
@@ -303,9 +312,9 @@ class MiniProgramApiTests(unittest.TestCase):
         updated = self.client.put('/api/admin/books/' + book['id'], json={'title': '更新图书', 'copies': 3})
         self.assertEqual(updated.status_code, 200)
         self.assertEqual(updated.get_json()['copies'], 3)
-        self.assertEqual(self.client.delete('/api/admin/books/' + book['id']).status_code, 200)
+        self.assertEqual(self.client.delete('/api/admin/books/' + book['id'], json={}).status_code, 200)
         record = self.borrow()
-        self.assertEqual(self.client.post('/api/admin/borrows/' + record['id'] + '/return').status_code, 200)
+        self.assertEqual(self.client.post('/api/admin/borrows/' + record['id'] + '/return', json={}).status_code, 200)
         stats = self.client.get('/api/admin/stats').get_json()
         self.assertEqual(stats['returnedTotal'], 1)
         self.assertEqual(stats['totalBooks'], 16)
@@ -313,12 +322,14 @@ class MiniProgramApiTests(unittest.TestCase):
     def test_concurrent_requests_cannot_double_book_or_overdraw_stock(self):
         def borrow_one(phone):
             client = server.app.test_client()
+            client.environ_base['HTTP_AUTHORIZATION'] = 'Bearer ' + (self.token if phone == self.phone else self.other_token)
             return client.post('/api/borrows', json={
                 'bookId': 'b10', 'name': '并发测试', 'phone': phone,
             }).status_code
 
         def reserve_one(phone):
             client = server.app.test_client()
+            client.environ_base['HTTP_AUTHORIZATION'] = 'Bearer ' + (self.token if phone == self.phone else self.other_token)
             return client.post('/api/room/bookings', json=self.room_data(phone=phone)).status_code
 
         with ThreadPoolExecutor(max_workers=2) as executor:

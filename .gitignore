@@ -10,3 +10,8 @@ static/uploads/volunteer/*
 project.private.config.json
 .qa/
 node_modules/
+*.db.lock
+deploy/app.env
+deploy/.env
+backups/
+server.local.json

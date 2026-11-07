@@ -14,13 +14,11 @@ Page({
     this.setData({ loading: true, error: '' });
     try {
       if (this.reviewId) {
-        const phone = this.data.form.phone;
-        if (!/^\d{11}$/.test(phone)) throw new Error('请先在「我的」查询记录后再编辑书评');
-        const mine = await api.request('/api/reviews/mine', 'GET', { phone });
+        const mine = await api.request('/api/reviews/mine');
         const review = mine.find(item => item.id === this.reviewId);
         if (!review) throw new Error('未找到这篇书评，请返回我的记录重新选择');
         this.bookId = review.bookId;
-        this.setData({ form: { name: review.name, phone, content: review.content, rating: review.rating } });
+        this.setData({ form: { name: review.name, phone: review.phone, content: review.content, rating: review.rating } });
       }
       const book = await api.request('/api/books/' + encodeURIComponent(this.bookId));
       this.setData({ book });
@@ -31,8 +29,9 @@ Page({
     return ui.run(this, async () => {
       const form = Object.assign({}, this.data.form, { name: this.data.form.name.trim(), phone: this.data.form.phone.trim(), content: this.data.form.content.trim() });
       ui.validateContact(form); ui.requireConsent(this.data.accepted);
+      await api.login();
       if (form.content.length < 10 || form.content.length > 500) throw new Error('读后感请填写 10–500 个字');
-      const eligibility = await api.request('/api/reviews/eligibility', 'GET', { book_id: this.bookId, phone: form.phone });
+      const eligibility = await api.request('/api/reviews/eligibility', 'GET', { book_id: this.bookId });
       this.setData({ eligibility });
       if (!eligibility.canReview) throw new Error(eligibility.reason);
       await api.request(this.reviewId ? '/api/reviews/' + encodeURIComponent(this.reviewId) : '/api/reviews', this.reviewId ? 'PUT' : 'POST', Object.assign({ bookId: this.bookId }, form));

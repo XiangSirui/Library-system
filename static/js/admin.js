@@ -1,5 +1,6 @@
+let csrfToken = '';
 /**
- * 阅享空间 · 管理后台
+ * 科育邻里 · 管理后台
  */
 
 const PANEL_TITLES = {
@@ -32,6 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   initNav();
   initBookModal();
+  initDoorModal();
   initFilters();
   initSlotSettings();
   await loadDashboard();
@@ -39,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function apiRequest(url, options = {}) {
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken, ...(options.headers || {}) },
     credentials: 'same-origin',
     ...options,
   });
@@ -49,6 +51,7 @@ async function apiRequest(url, options = {}) {
     throw new Error('未登录');
   }
   if (!res.ok) throw new Error(data.error || '请求失败');
+  if (data.csrfToken) csrfToken = data.csrfToken;
   return data;
 }
 
@@ -216,6 +219,7 @@ async function loadBorrows() {
         <td>${r.dueDate}</td>
         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
         <td class="table-actions">
+          <button class="btn btn-outline btn-sm" data-door="${r.id}">门锁密码</button>
           ${r.status === 'borrowed' ? `<button class="btn btn-primary btn-sm" data-return="${r.id}">确认归还</button>` : '—'}
         </td>
       </tr>
@@ -263,6 +267,7 @@ async function loadRooms() {
         </td>
         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
         <td class="table-actions">
+          <button class="btn btn-outline btn-sm" data-door="${r.id}">门锁密码</button>
           ${r.status === 'upcoming' ? `<button class="btn btn-danger btn-sm" data-cancel="${r.id}">取消预约</button>` : '—'}
         </td>
       </tr>
@@ -272,6 +277,7 @@ async function loadRooms() {
   tbody.querySelectorAll('[data-cancel]').forEach(btn => {
     btn.addEventListener('click', () => adminCancelRoom(btn.dataset.cancel));
   });
+  tbody.querySelectorAll('[data-door]').forEach(btn => btn.addEventListener('click', () => openDoorEditor(btn.dataset.door)));
   tbody.querySelectorAll('[data-volunteer]').forEach(btn => {
     btn.addEventListener('click', () => showVolunteerDetail(btn.dataset.volunteer));
   });
@@ -306,6 +312,10 @@ function openModal(id) {
   document.getElementById(id)?.classList.add('active');
 }
 function closeModal(id) {
+  if (id === 'doorModal') {
+    document.getElementById('doorPassword').value = '';
+    doorBookingId = '';
+  }
   document.getElementById(id)?.classList.remove('active');
 }
 
@@ -645,6 +655,7 @@ async function loadReviews() {
         <td><span class="status-badge ${cls}">${text}</span></td>
         <td>${(r.updatedAt || r.createdAt || '').slice(0, 16).replace('T', ' ')}</td>
         <td class="table-actions">
+          <button class="btn btn-outline btn-sm" data-door="${r.id}">门锁密码</button>
           ${r.status !== 'approved' ? `<button class="btn btn-primary btn-sm" data-approve="${r.id}">通过</button>` : ''}
           ${r.status !== 'rejected' ? `<button class="btn btn-outline btn-sm" data-reject="${r.id}">驳回</button>` : ''}
           <button class="btn btn-danger btn-sm" data-del-review="${r.id}">删除</button>
@@ -719,4 +730,39 @@ function showToast(msg, type = 'success') {
   t.textContent = msg;
   document.getElementById('toastContainer').appendChild(t);
   setTimeout(() => t.remove(), 3000);
+}
+
+let doorBookingId = '';
+let doorBusy = false;
+function initDoorModal() {
+  document.getElementById('doorForm').addEventListener('submit', event => { event.preventDefault(); saveDoorCode(false); });
+  document.getElementById('doorRemove').addEventListener('click', () => saveDoorCode(true));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) closeModal('doorModal'); });
+}
+async function openDoorEditor(id) {
+  try {
+    const result = await apiRequest('/api/admin/room/bookings/' + encodeURIComponent(id) + '/access');
+    doorBookingId = id;
+    const record = (window._adminRoomRecords || []).find(item => item.id === id);
+    document.getElementById('doorBookingLabel').textContent = '预约编号：' + (record ? record.code : id);
+    document.getElementById('doorState').textContent = !result.editable ? '预约已结束、取消或签退，仅可移除已保存的密码。' : result.configured ? '已设置密码，输入新密码可替换。' : '尚未设置密码。';
+    document.getElementById('doorPassword').value = '';
+    document.getElementById('doorPassword').disabled = !result.editable;
+    document.getElementById('doorSave').disabled = !result.editable;
+    document.getElementById('doorRemove').disabled = !result.configured;
+    openModal('doorModal');
+  } catch (error) { showToast(error.message, 'error'); }
+}
+async function saveDoorCode(remove) {
+  if (doorBusy || !doorBookingId) return;
+  const password = document.getElementById('doorPassword').value;
+  if (!remove && !/^[0-9A-Za-z*#]{4,32}$/.test(password)) { showToast('请输入 4 至 32 位数字、字母、* 或 #', 'error'); return; }
+  if (!confirm(remove ? '移除后居民将无法查看密码。实体门锁密码需另行更换，确认移除？' : '确认实体门锁已设置相同密码？保存后该预约居民即可查看。')) return;
+  doorBusy = true;
+  try {
+    await apiRequest('/api/admin/room/bookings/' + encodeURIComponent(doorBookingId) + '/access', { method: remove ? 'DELETE' : 'PUT', body: JSON.stringify(remove ? {} : { password }) });
+    closeModal('doorModal');
+    showToast(remove ? '门锁密码已移除' : '门锁密码已保存', 'success');
+  } catch (error) { showToast(error.message, 'error'); }
+  finally { doorBusy = false; }
 }

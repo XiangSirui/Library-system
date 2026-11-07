@@ -1,14 +1,4 @@
-services:
-  - type: web
-    name: yuexiang-library
-    runtime: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
-    envVars:
-      - key: SECRET_KEY
-        generateValue: true
-      - key: FLASK_DEBUG
-        value: "0"
-      - key: TZ
-        value: Asia/Shanghai
+# Retired: the old free instance lost SQLite data and photos on restart.
+# Use deploy/compose.yaml with persistent volumes, HTTPS and required secrets.
+# This file intentionally declares no deployable services.
+services: []

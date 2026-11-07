@@ -1,4 +1,4 @@
-"""阅享空间 · SQLite 数据库层"""
+"""科育邻里 · SQLite 数据库层"""
 
 import os
 import sqlite3
@@ -62,6 +62,13 @@ def get_db():
         raise
     finally:
         conn.close()
+
+
+def _initial_admin_password():
+    password = os.environ.get('INITIAL_ADMIN_PASSWORD', '')
+    if os.environ.get('LIBRARY_ENV') == 'production' and len(password) < 12:
+        raise RuntimeError('INITIAL_ADMIN_PASSWORD must contain at least 12 characters for a new production database')
+    return password or 'admin123'
 
 
 def init_db():
@@ -167,12 +174,14 @@ def init_db():
         ''')
 
         _migrate_book_reviews_allow_multiple(conn)
+        from identity import init_schema
+        init_schema(conn)
 
         admin_count = conn.execute('SELECT COUNT(*) FROM admins').fetchone()[0]
         if admin_count == 0:
             conn.execute(
                 'INSERT INTO admins (username, password_hash, display_name, created_at) VALUES (?, ?, ?, ?)',
-                ('admin', generate_password_hash('admin123'), '管理员', datetime.now().isoformat())
+                ('admin', generate_password_hash(_initial_admin_password()), '管理员', datetime.now().isoformat())
             )
 
         # 默认时段模板：全部开放；已有库仅补全缺失时段
@@ -340,6 +349,7 @@ def get_book(book_id):
 def row_to_borrow(row):
     return {
         'id': row['id'],
+        'ownerId': row['owner_id'],
         'code': row['code'],
         'bookId': row['book_id'],
         'bookTitle': row['book_title'],
@@ -356,15 +366,15 @@ def row_to_borrow(row):
     }
 
 
-def list_borrows(phone='', tab='active'):
-    if not phone:
+def list_borrows(phone='', owner_id=None, tab='active'):
+    if not owner_id:
         return []
     with get_db() as conn:
         query = 'SELECT * FROM borrows WHERE 1=1'
         params = []
-        if phone:
-            query += ' AND phone = ?'
-            params.append(phone)
+        if owner_id:
+            query += ' AND owner_id = ?'
+            params.append(owner_id)
         if tab == 'active':
             query += " AND status = 'borrowed'"
         else:
@@ -374,7 +384,7 @@ def list_borrows(phone='', tab='active'):
         return [row_to_borrow(r) for r in rows]
 
 
-def create_borrow(book_id, name, phone, card=''):
+def create_borrow(book_id, name, phone, card='', owner_id=None):
     with get_db() as conn:
         conn.execute('BEGIN IMMEDIATE')
         book = conn.execute('SELECT * FROM books WHERE id = ?', (book_id,)).fetchone()
@@ -389,8 +399,8 @@ def create_borrow(book_id, name, phone, card=''):
             return None, '该图书已借完'
 
         active_user = conn.execute(
-            "SELECT COUNT(*) FROM borrows WHERE phone = ? AND status = 'borrowed'",
-            (phone,)
+            "SELECT COUNT(*) FROM borrows WHERE owner_id = ? AND status = 'borrowed'",
+            (owner_id,)
         ).fetchone()[0]
         if active_user >= MAX_BORROWS:
             return None, f'每人最多同时借阅 {MAX_BORROWS} 本'
@@ -404,13 +414,14 @@ def create_borrow(book_id, name, phone, card=''):
         conn.execute(
             '''INSERT INTO borrows
                (id, code, book_id, book_title, author, name, phone, card,
-                borrow_date, due_date, renewed, status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'borrowed', ?)''',
+                borrow_date, due_date, renewed, status, created_at, owner_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'borrowed', ?, ?)''',
             (record_id, code, book_id, book['title'], book['author'],
-             name, phone, card or None, borrow_date, due_date, now.isoformat())
+             name, phone, card or None, borrow_date, due_date, now.isoformat(), owner_id)
         )
 
-        upsert_user(conn, phone, name, card)
+        if not owner_id:
+            upsert_user(conn, phone, name, card)
         row = conn.execute('SELECT * FROM borrows WHERE id = ?', (record_id,)).fetchone()
         return row_to_borrow(row), None
 
@@ -457,6 +468,7 @@ def row_to_room_booking(row):
     keys = row.keys()
     return {
         'id': row['id'],
+        'ownerId': row['owner_id'],
         'code': row['code'],
         'date': row['date'],
         'timeSlot': row['time_slot'],
@@ -732,15 +744,15 @@ def get_room_calendar(days=BOOKING_DAYS, include_details=False, include_closed=F
     }
 
 
-def list_room_bookings(phone='', tab='upcoming'):
-    if not phone:
+def list_room_bookings(phone='', owner_id=None, tab='upcoming'):
+    if not owner_id:
         return []
     with get_db() as conn:
         query = "SELECT * FROM room_bookings WHERE 1=1"
         params = []
-        if phone:
-            query += ' AND phone = ?'
-            params.append(phone)
+        if owner_id:
+            query += ' AND owner_id = ?'
+            params.append(owner_id)
         rows = conn.execute(query, params).fetchall()
         now = datetime.now()
         results = []
@@ -770,7 +782,7 @@ def valid_date(value):
         return False
 
 
-def create_room_booking(date, time_slot, duration, purpose, name, phone, attendees):
+def create_room_booking(date, time_slot, duration, purpose, name, phone, attendees, owner_id=None):
     if not valid_date(date) or time_slot not in ALL_TIME_SLOTS:
         return None, '预约日期或时段无效'
     if not isinstance(duration, int) or isinstance(duration, bool) or not 1 <= duration <= 3:
@@ -806,8 +818,8 @@ def create_room_booking(date, time_slot, duration, purpose, name, phone, attende
                 return None, '该时段已被预约'
 
         today_count = conn.execute(
-            "SELECT COUNT(*) FROM room_bookings WHERE phone = ? AND date = ? AND status = 'upcoming'",
-            (phone, date)
+            "SELECT COUNT(*) FROM room_bookings WHERE owner_id = ? AND date = ? AND status = 'upcoming'",
+            (owner_id, date)
         ).fetchone()[0]
         if today_count >= 1:
             return None, '每人每日最多预约活动室 1 次'
@@ -819,12 +831,13 @@ def create_room_booking(date, time_slot, duration, purpose, name, phone, attende
         conn.execute(
             '''INSERT INTO room_bookings
                (id, code, date, time_slot, duration, purpose, name, phone, attendees,
-                status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'upcoming', ?)''',
+                status, created_at, owner_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'upcoming', ?, ?)''',
             (record_id, code, date, time_slot, duration, purpose, name, phone, attendees,
-             now.isoformat())
+             now.isoformat(), owner_id)
         )
-        upsert_user(conn, phone, name, None)
+        if not owner_id:
+            upsert_user(conn, phone, name, None)
         row = conn.execute('SELECT * FROM room_bookings WHERE id = ?', (record_id,)).fetchone()
         return row_to_room_booking(row), None
 
@@ -976,7 +989,7 @@ def get_admin_stats():
             "SELECT COUNT(*) FROM room_bookings WHERE date = ? AND status = 'upcoming'",
             (today,)
         ).fetchone()[0]
-        reader_count = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+        reader_count = conn.execute('SELECT COUNT(*) FROM members').fetchone()[0]
         pending_reviews = conn.execute(
             "SELECT COUNT(*) FROM book_reviews WHERE status = 'pending'"
         ).fetchone()[0]
@@ -1193,6 +1206,7 @@ def row_to_review(row, mask_name=False, include_phone=False):
     }
     if include_phone:
         item['phone'] = row['phone']
+        item['ownerId'] = row['owner_id']
     if 'book_title' in keys:
         item['bookTitle'] = row['book_title']
     if 'author' in keys:
@@ -1200,38 +1214,38 @@ def row_to_review(row, mask_name=False, include_phone=False):
     return item
 
 
-def has_borrowed_book(conn, book_id, phone):
+def has_borrowed_book(conn, book_id, owner_id):
     row = conn.execute(
         '''SELECT id FROM borrows
-           WHERE book_id = ? AND phone = ?
+           WHERE book_id = ? AND owner_id = ?
              AND status IN ('borrowed', 'returned')
            ORDER BY created_at DESC LIMIT 1''',
-        (book_id, phone)
+        (book_id, owner_id)
     ).fetchone()
     return row['id'] if row else None
 
 
-def get_review_eligibility(book_id, phone):
+def get_review_eligibility(book_id, owner_id):
     book = get_book(book_id)
     if not book:
         return None, '图书不存在'
-    if not phone or len(phone) != 11 or not phone.isdigit():
+    if not owner_id:
         return {
             'canReview': False,
-            'reason': '请先填写有效手机号',
+            'reason': '请先微信登录',
             'hasBorrowed': False,
             'myReviewCount': 0,
             'pendingCount': 0,
         }, None
 
     with get_db() as conn:
-        borrow_id = has_borrowed_book(conn, book_id, phone)
+        borrow_id = has_borrowed_book(conn, book_id, owner_id)
         counts = conn.execute(
             '''SELECT
                  COUNT(*) AS total,
                  SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_cnt
-               FROM book_reviews WHERE book_id = ? AND phone = ?''',
-            (book_id, phone)
+               FROM book_reviews WHERE book_id = ? AND owner_id = ?''',
+            (book_id, owner_id)
         ).fetchone()
         my_count = counts['total'] or 0
         pending_count = counts['pending_cnt'] or 0
@@ -1281,19 +1295,18 @@ def list_book_reviews(book_id, status='approved'):
         }, None
 
 
-def list_my_reviews(phone, book_id=''):
-    phone = (phone or '').strip()
-    if not phone or len(phone) != 11 or not phone.isdigit():
-        return None, '请输入正确的手机号'
+def list_my_reviews(owner_id, book_id=''):
+    if not owner_id:
+        return None, '请先微信登录'
 
     with get_db() as conn:
         query = '''
             SELECT r.*, b.title AS book_title, b.author
             FROM book_reviews r
             JOIN books b ON b.id = r.book_id
-            WHERE r.phone = ?
+            WHERE r.owner_id = ?
         '''
-        params = [phone]
+        params = [owner_id]
         if book_id:
             query += ' AND r.book_id = ?'
             params.append(book_id)
@@ -1322,7 +1335,7 @@ def get_my_review(review_id, phone):
         return row_to_review(row, include_phone=True), None
 
 
-def create_review(book_id, phone, name, rating, content):
+def create_review(book_id, phone, name, rating, content, owner_id=None):
     name = (name or '').strip()
     phone = (phone or '').strip()
     content = (content or '').strip()
@@ -1347,22 +1360,23 @@ def create_review(book_id, phone, name, rating, content):
         if not book:
             return None, '图书不存在'
 
-        borrow_id = has_borrowed_book(conn, book_id, phone)
+        borrow_id = has_borrowed_book(conn, book_id, owner_id)
         if not borrow_id:
             return None, '借阅过本书后才能发表读后感'
 
         now = datetime.now()
-        review_id = f'{int(now.timestamp() * 1000)}{random.randint(100, 999)}'
+        review_id = uuid.uuid4().hex
         now_iso = now.isoformat()
         conn.execute(
             '''INSERT INTO book_reviews
                (id, book_id, phone, name, rating, content, status,
-                borrow_id, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)''',
-            (review_id, book_id, phone, name, rating, content, borrow_id, now_iso, now_iso)
+                borrow_id, created_at, updated_at, owner_id)
+               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)''',
+            (review_id, book_id, phone, name, rating, content, borrow_id, now_iso, now_iso, owner_id)
         )
 
-        upsert_user(conn, phone, name, None)
+        if not owner_id:
+            upsert_user(conn, phone, name, None)
         row = conn.execute('SELECT * FROM book_reviews WHERE id = ?', (review_id,)).fetchone()
         return row_to_review(row, include_phone=True), None
 
@@ -1371,16 +1385,14 @@ def create_review(book_id, phone, name, rating, content):
 create_or_update_review = create_review
 
 
-def update_review(review_id, phone, rating=None, content=None, name=None):
+def update_review(review_id, phone, rating=None, content=None, name=None, owner_id=None):
     phone = (phone or '').strip()
-    if not phone or len(phone) != 11 or not phone.isdigit():
-        return None, '请输入正确的手机号'
 
     with get_db() as conn:
         row = conn.execute('SELECT * FROM book_reviews WHERE id = ?', (review_id,)).fetchone()
         if not row:
             return None, '书评不存在'
-        if row['phone'] != phone:
+        if not owner_id or row['owner_id'] != owner_id:
             return None, '无权修改该书评'
 
         new_name = (name or row['name']).strip()
@@ -1407,13 +1419,12 @@ def update_review(review_id, phone, rating=None, content=None, name=None):
         return row_to_review(updated, include_phone=True), None
 
 
-def delete_review_by_user(review_id, phone):
-    phone = (phone or '').strip()
+def delete_review_by_user(review_id, owner_id):
     with get_db() as conn:
         row = conn.execute('SELECT * FROM book_reviews WHERE id = ?', (review_id,)).fetchone()
         if not row:
             return False, '书评不存在'
-        if row['phone'] != phone:
+        if not owner_id or row['owner_id'] != owner_id:
             return False, '无权删除该书评'
         conn.execute('DELETE FROM book_reviews WHERE id = ?', (review_id,))
         return True, None

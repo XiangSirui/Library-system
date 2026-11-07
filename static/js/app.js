@@ -1,5 +1,5 @@
 /**
- * 阅享空间 · 社区共享图书馆
+ * 科育邻里 · 社区共享图书馆
  * 前端 + Flask API 联调版
  */
 let books = [];
@@ -227,6 +227,7 @@ function initBookFilters() {
 }
 // ========== Borrow Modal ==========
 function openBorrowModal(bookId) {
+  showToast('请在微信小程序登录后办理此服务'); return;
   selectedBook = books.find(b => b.id === bookId);
   if (!selectedBook || (selectedBook.available ?? 0) === 0) return;
   document.getElementById('borrowBookId').value = bookId;
@@ -383,6 +384,7 @@ async function renderRoomShowcase() {
   document.getElementById('openRoomModal').addEventListener('click', openRoomCalendar);
 }
 function openRoomBookingForm(date, timeSlot) {
+  showToast('请在微信小程序登录后办理此服务'); return;
   selectedRoomSlot = timeSlot;
   const user = getUser();
   document.getElementById('roomName').value = user.name || '';
@@ -509,6 +511,7 @@ async function cancelRoomBooking(id) {
   }
 }
 function openCheckoutModal(booking) {
+  showToast('请在微信小程序登录后办理此服务'); return;
   const endHour = parseInt(booking.timeSlot) + booking.duration;
   document.getElementById('checkoutBookingId').value = booking.id;
   document.getElementById('volunteerNote').value = '';
@@ -968,6 +971,7 @@ function setWriteReviewMode(mode) {
 }
 
 async function openWriteReviewModal(bookId) {
+  showToast('请在微信小程序登录后办理此服务'); return;
   const book = books.find(b => b.id === bookId) || await apiRequest(`/api/books/${bookId}`).catch(() => null);
   if (!book) {
     showToast('图书不存在', 'error');
@@ -1024,6 +1028,7 @@ async function openWriteReviewModal(bookId) {
 }
 
 async function openEditReviewModal(reviewId, bookId) {
+  showToast('请在微信小程序登录后办理此服务'); return;
   const phone = (document.getElementById('myReviewsPhone')?.value || '').trim()
     || getRecordsPhone()
     || getUser().phone

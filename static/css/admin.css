@@ -1,4 +1,4 @@
-/* 阅享空间 · 管理后台 */
+/* 科育邻里 · 管理后台 */
 
 :root {
   --color-bg: #f4f1ec;
@@ -682,3 +682,8 @@ body {
 .reject-reason { color: var(--color-danger); }
 .hidden { display: none !important; }
 
+
+/* Keep reservation actions readable inside the horizontally scrolling table. */
+#panel-rooms .admin-table { min-width: 900px; }
+.table-actions .btn { white-space: nowrap; flex-shrink: 0; }
+#doorModal p { margin-bottom: 12px; line-height: 1.7; font-size: 0.9rem; }

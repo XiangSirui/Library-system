@@ -18,9 +18,12 @@ function deferred() {
 }
 function wxHarness() {
   const storage = new Map();
-  const calls = { requests: [], uploads: [], toasts: [], modals: [], navigation: [] };
+  const calls = { requests: [], uploads: [], toasts: [], modals: [], navigation: [], logins: [], downloads: [] };
   const wx = {
     request(options) { calls.requests.push(options); },
+    login(options) { calls.logins.push(options); options.success({ code: 'test-code' }); },
+    downloadFile(options) { calls.downloads.push(options); },
+    getFileSystemManager() { return { unlink() {} }; },
     uploadFile(options) { calls.uploads.push(options); },
     getStorageSync(key) { return storage.get(key); },
     setStorageSync(key, value) { storage.set(key, copy(value)); },
@@ -61,9 +64,12 @@ function setData(patch) {
 }
 function pageHarness(name, responder) {
   const harness = wxHarness();
-  const ui = loadModule('miniprogram/utils/ui.js', {}, harness);
+  let currentUser = { id: 'reader-A' };
   const requests = [];
   const api = {
+    user() { return currentUser; },
+    async login() { currentUser = currentUser || { id: 'reader-A' }; return currentUser; },
+    async logout() { currentUser = null; },
     async request(endpoint, method = 'GET', data = {}) {
       const call = { endpoint, method, data: copy(data) };
       requests.push(call);
@@ -73,9 +79,10 @@ function pageHarness(name, responder) {
     query(data) { return Object.keys(data).map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key])).join('&'); },
     asset(value) { return value ? 'https://service.example' + value : ''; }
   };
+  const ui = loadModule('miniprogram/utils/ui.js', { './api': api }, harness);
   let definition;
   vm.runInNewContext(fs.readFileSync(path.join(root, 'miniprogram/pages', name, 'index.js'), 'utf8'), {
-    wx: harness.wx, console, Page(value) { definition = value; },
+    wx: harness.wx, console, setTimeout, clearTimeout, Page(value) { definition = value; },
     require(request) {
       if (request === '../../utils/api') return api;
       if (request === '../../utils/ui') return ui;
@@ -83,11 +90,16 @@ function pageHarness(name, responder) {
     }
   }, { filename: 'pages/' + name + '/index.js' });
   const page = { ...definition, data: copy(definition.data), setData };
-  return { ...harness, page, ui, requests };
+  return { ...harness, page, ui, requests, setUser(value) { currentUser = value; } };
 }
 function apiHarness(config = { baseUrl: () => 'https://service.example' }) {
   const harness = wxHarness();
   return { ...harness, api: loadModule('miniprogram/utils/api.js', { '../config': config }, harness) };
+}
+async function nativeLogin(harness, id = 'reader-A') {
+  const pending = harness.api.login();
+  harness.calls.requests.at(-1).success(response({ token: 'opaque-test-token', expiresAt: Math.floor(Date.now() / 1000) + 3600, user: { id } }));
+  return pending;
 }
 function response(data, statusCode = 200, extra = {}) { return { data, statusCode, ...extra }; }
 function validContact() { return { name: '测试读者', phone: '13800138000', card: 'C-01' }; }
@@ -165,7 +177,8 @@ test('configuration failures and request network failures reject cleanly', async
 });
 
 test('photo upload sends the expected multipart field and parses JSON', async () => {
-  const { api, calls } = apiHarness();
+  const harness = apiHarness(); await nativeLogin(harness);
+  const { api, calls } = harness;
   const data = { phone: '13800138000', volunteerNote: '社区花园志愿浇水' };
   const pending = api.upload('/api/room/bookings/r1/checkout', 'wxfile://photo.jpg', data);
   const upload = calls.uploads[0];
@@ -178,24 +191,25 @@ test('photo upload sends the expected multipart field and parses JSON', async ()
 });
 
 test('uploads reject business errors, oversized files, malformed JSON, and network errors', async () => {
-  const { api, calls } = apiHarness();
-  let pending = api.upload('/checkout', 'photo.jpg', {});
+  const harness = apiHarness(); await nativeLogin(harness);
+  const { api, calls } = harness;
+  let pending = api.upload('/api/room/bookings/r1/checkout', 'photo.jpg', {});
   calls.uploads.at(-1).success(response('{"error":"活动开始后方可签退"}', 400));
   await assert.rejects(pending, error => error.status === 400 && /活动开始/.test(error.message));
-  pending = api.upload('/checkout', 'photo.jpg', {});
+  pending = api.upload('/api/room/bookings/r1/checkout', 'photo.jpg', {});
   calls.uploads.at(-1).success(response('{}', 413));
   await assert.rejects(pending, error => error.status === 413 && /5 MB/.test(error.message));
-  pending = api.upload('/checkout', 'photo.jpg', {});
+  pending = api.upload('/api/room/bookings/r1/checkout', 'photo.jpg', {});
   calls.uploads.at(-1).success(response('<html>gateway error</html>', 502));
   await assert.rejects(pending, /服务返回异常/);
-  pending = api.upload('/checkout', 'photo.jpg', {});
+  pending = api.upload('/api/room/bookings/r1/checkout', 'photo.jpg', {});
   calls.uploads.at(-1).fail({ errMsg: 'uploadFile:fail' });
   await assert.rejects(pending, /上传失败/);
 });
 
 test('contact validation, consent, and local profile preserve only contact fields', () => {
   const harness = wxHarness();
-  const ui = loadModule('miniprogram/utils/ui.js', {}, harness);
+  const ui = loadModule('miniprogram/utils/ui.js', { './api': { user: () => ({ id: 'reader-A' }) } }, harness);
   assert.deepEqual(copy(ui.profile()), { name: '', phone: '', card: '' });
   assert.throws(() => ui.validateContact({ name: ' ', phone: '13800138000' }), /姓名/);
   for (const phone of ['', '1380013800', '138001380000', '13800abc000']) {
@@ -220,6 +234,7 @@ test('book borrowing is single-flight and shows the returned pickup code and due
   page.setData({ form: validContact(), accepted: true });
   const first = page.borrow();
   const second = page.borrow();
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(page.data.busy, true);
   assert.equal(requests.filter(call => call.method === 'POST').length, 1);
   gate.resolve({ code: 'JY-TEST', dueDate: '2026-11-29' });
@@ -249,6 +264,7 @@ test('ineligible readers cannot submit a review', async () => {
   assert.equal(requests.length, 1);
   assert.equal(requests[0].endpoint, '/api/reviews/eligibility');
   assert.equal(requests[0].data.book_id, 'b1');
+  assert.equal(requests[0].data.phone, undefined);
   assert.equal(page.data.eligibility.canReview, false);
   assert.match(calls.toasts.at(-1).title, /借阅过本书/);
 });
@@ -325,51 +341,227 @@ test('room booking validates capacity and returns a successful reservation recei
   assert.equal(page.data.result.code, 'HD-TEST');
 });
 
-test('my records never requests unfiltered records or queries without consent', async () => {
-  const { page, requests, calls } = pageHarness('mine');
+test('my records requires login and consent instead of a phone lookup', async () => {
+  const { page, requests, calls, setUser } = pageHarness('mine');
+  setUser(null);
   await page.load();
   assert.equal(requests.length, 0);
-  page.setData({ phone: validContact().phone });
-  await page.load();
-  assert.equal(requests.length, 0);
-  await page.query();
+  await page.login();
   assert.equal(requests.length, 0);
   assert.match(calls.toasts.at(-1).title, /隐私/);
 });
 
-test('changing phone clears old records immediately and ignores late responses', async () => {
-  const oldGate = deferred();
-  const newGate = deferred();
-  const oldPhone = '13800138000';
-  const newPhone = '13900139000';
-  const { page, requests } = pageHarness('mine', ({ data }) => data.phone === oldPhone ? oldGate.promise : newGate.promise);
-  page.setData({ phone: oldPhone, queriedPhone: oldPhone, accepted: true, records: [{ id: 'cached-old' }] });
+test('switching identity clears records and ignores the previous account response', async () => {
+  const oldGate = deferred(), newGate = deferred();
+  let count = 0;
+  const { page, setUser, requests } = pageHarness('mine', () => (++count === 1 ? oldGate.promise : newGate.promise));
   const oldRequest = page.load();
-  page.phoneInput({ detail: { value: newPhone } });
+  setUser({ id: 'reader-B' });
+  const newRequest = page.load();
   assert.deepEqual(copy(page.data.records), []);
-  assert.equal(page.data.queriedPhone, '');
-  const newQuery = page.query();
-  assert.equal(requests.at(-1).data.phone, newPhone);
+  assert.equal(requests.at(-1).data.phone, undefined);
   newGate.resolve([{ id: 'new-record', status: 'returned', dueDate: '2026-11-01' }]);
-  await newQuery;
+  await newRequest;
   oldGate.resolve([{ id: 'old-record', status: 'borrowed', dueDate: '2026-01-01' }]);
   await oldRequest;
-  assert.equal(page.data.records.length, 1);
   assert.equal(page.data.records[0].id, 'new-record');
-  assert.equal(page.data.queriedPhone, newPhone);
+  assert.equal(page.data.user.id, 'reader-B');
   assert.equal(page.data.loading, false);
 });
 
-test('my record mutations include the queried phone and cannot run after changing identity', async () => {
-  const { page, requests } = pageHarness('mine', ({ method }) => method === 'POST' ? { status: 'returned' } : []);
-  const phone = validContact().phone;
-  page.setData({ phone, queriedPhone: phone, records: [{ id: 'borrow/1', status: 'borrowed' }] });
+test('record mutations omit phone identity and cannot run after switching account', async () => {
+  const { page, requests, setUser } = pageHarness('mine', ({ method }) => method === 'POST' ? { status: 'returned' } : []);
+  page.syncUser();
+  page.setData({ records: [{ id: 'borrow/1', status: 'borrowed' }] });
   await page.action({ currentTarget: { dataset: { id: 'borrow/1', action: 'return' } } });
   const mutation = requests.find(call => call.method === 'POST');
   assert.equal(mutation.endpoint, '/api/borrows/borrow%2F1/return');
-  assert.equal(mutation.data.phone, phone);
-  page.phoneInput({ detail: { value: '13900139000' } });
+  assert.equal(mutation.data.phone, undefined);
+  page.setData({ records: [{ id: 'borrow/2', status: 'borrowed' }] });
+  setUser({ id: 'reader-B' });
   const count = requests.length;
-  await page.action({ currentTarget: { dataset: { id: 'borrow/1', action: 'return' } } });
+  await page.action({ currentTarget: { dataset: { id: 'borrow/2', action: 'return' } } });
   assert.equal(requests.length, count);
+});
+
+test('local connection failures explain backend startup and domain validation separately', async () => {
+  const { api, calls } = apiHarness({ baseUrl: () => 'http://127.0.0.1:5000' });
+  let pending = api.request('/api/room/calendar');
+  calls.requests.at(-1).fail({ errMsg: 'request:fail net::ERR_CONNECTION_REFUSED' });
+  await assert.rejects(pending, /启动本地后端.*scripts\/dev_miniprogram\.py/);
+  pending = api.request('/api/room/calendar');
+  calls.requests.at(-1).fail({ errMsg: 'request:fail url not in domain list' });
+  await assert.rejects(pending, /域名校验拦截/);
+});
+
+test('development loopback works in the simulator but explains why it cannot work on a phone', () => {
+  const harness = wxHarness();
+  harness.wx.getAccountInfoSync = () => ({ miniProgram: { envVersion: 'develop' } });
+  harness.wx.getDeviceInfo = () => ({ platform: 'devtools' });
+  const config = loadModule('miniprogram/config.js', {}, harness);
+  assert.equal(config.baseUrl(), 'http://127.0.0.1:5000');
+  harness.wx.getDeviceInfo = () => ({ platform: 'ios' });
+  assert.throws(() => config.baseUrl(), /真机无法访问电脑/);
+  harness.wx.getDeviceInfo = () => ({ platform: 'android' });
+  assert.throws(() => config.baseUrl(), /HTTPS 测试域名/);
+  harness.wx.getAccountInfoSync = () => ({ miniProgram: { envVersion: 'release' } });
+  assert.throws(() => config.baseUrl(), /服务尚未配置/);
+});
+
+test('calendar failure clears stale selections and retry restores actual dates and slots', async () => {
+  let online = false;
+  const day = { date: '2026-11-07', weekday: '周六', freeSlots: 1, slots: [{ time: '10:00', status: 'free' }] };
+  const { page } = pageHarness('room', () => {
+    if (!online) throw new Error('无法连接服务');
+    return { days: [day] };
+  });
+  page.selectDay(day, false);
+  page.selectTime('10:00');
+  await page.load();
+  assert.match(page.data.error, /无法连接服务/);
+  for (const key of ['days', 'slots', 'durations', 'durationLabels']) assert.deepEqual(copy(page.data[key]), []);
+  for (const key of ['date', 'weekday', 'timeSlot', 'endTime']) assert.equal(page.data[key], '');
+  assert.equal(page.data.duration, 0);
+  online = true;
+  await page.load();
+  assert.equal(page.data.error, '');
+  assert.equal(page.data.loading, false);
+  assert.equal(page.data.days.length, 1);
+  assert.equal(page.data.date, day.date);
+  assert.equal(page.data.slots[0].label, '可预约');
+});
+test('WeChat login is single-flight, server identity wins, and credentials stay out of storage', async () => {
+  const harness = apiHarness();
+  const first = harness.api.login(), second = harness.api.login();
+  assert.equal(harness.calls.logins.length, 1);
+  assert.deepEqual(copy(harness.calls.requests[0].data), { code: 'test-code' });
+  harness.calls.requests[0].success(response({ token: 'private-token', expiresAt: Math.floor(Date.now() / 1000) + 3600, user: { id: 'server-member' } }));
+  await Promise.all([first, second]);
+  assert.equal(harness.api.user().id, 'server-member');
+  assert.equal(Array.from(harness.storage.values()).includes('private-token'), false);
+  const pending = harness.api.request('/api/borrows');
+  assert.equal(harness.calls.requests.at(-1).header.Authorization, 'Bearer private-token');
+  harness.calls.requests.at(-1).success(response([]));
+  await pending;
+});
+
+test('member and admin credentials are separated and admin mutations include CSRF', async () => {
+  const harness = apiHarness();
+  await nativeLogin(harness);
+  let pending = harness.api.request('/api/admin/login', 'POST', { username: 'operator', password: 'test' });
+  assert.equal(harness.calls.requests.at(-1).header.Authorization, undefined);
+  harness.calls.requests.at(-1).success(response({ csrfToken: 'csrf-value' }, 200, { cookies: ['session=admin-cookie; Path=/'] }));
+  await pending;
+  pending = harness.api.request('/api/admin/books/b1', 'PUT', { copies: 3 });
+  assert.equal(harness.calls.requests.at(-1).header['X-CSRF-Token'], 'csrf-value');
+  assert.equal(harness.calls.requests.at(-1).header.Cookie, 'session=admin-cookie');
+  assert.equal(harness.calls.requests.at(-1).header.Authorization, undefined);
+  harness.calls.requests.at(-1).success(response({}));
+  await pending;
+  pending = harness.api.request('/api/borrows');
+  assert.equal(harness.calls.requests.at(-1).header.Cookie, undefined);
+  assert.equal(harness.calls.requests.at(-1).header['X-CSRF-Token'], undefined);
+  harness.calls.requests.at(-1).success(response([]));
+  await pending;
+});
+
+test('logout discards late private responses and 401 clears member authentication', async () => {
+  const harness = apiHarness();
+  await nativeLogin(harness);
+  const old = harness.api.request('/api/borrows'), oldCall = harness.calls.requests.at(-1);
+  const quitting = harness.api.logout();
+  harness.calls.requests.at(-1).success(response({ ok: true }));
+  await quitting;
+  assert.equal(harness.api.user(), null);
+  oldCall.success(response([{ id: 'private-old-record' }]));
+  await assert.rejects(old, /登录状态已变化/);
+  await nativeLogin(harness);
+  const pending = harness.api.request('/api/borrows');
+  harness.calls.requests.at(-1).success(response({ error: '请重新登录' }, 401));
+  await assert.rejects(pending, error => error.status === 401);
+  assert.equal(harness.api.user(), null);
+});
+
+test('private uploads and image downloads carry identity and reject foreign URLs', async () => {
+  const harness = apiHarness();
+  await assert.rejects(harness.api.upload('/api/room/bookings/r1/checkout', 'photo.jpg', {}), /登录/);
+  await nativeLogin(harness);
+  const pending = harness.api.upload('/api/room/bookings/r1/checkout', 'photo.jpg', { volunteerNote: 'test' });
+  assert.equal(harness.calls.uploads[0].header.Authorization, 'Bearer opaque-test-token');
+  harness.calls.uploads[0].success(response('{}'));
+  await pending;
+  const photo = harness.api.downloadPhoto('/static/uploads/volunteer/test.png');
+  assert.equal(harness.calls.downloads[0].header.Authorization, 'Bearer opaque-test-token');
+  harness.calls.downloads[0].success({ statusCode: 200, tempFilePath: 'wxfile://private-photo.png' });
+  assert.equal(await photo, 'wxfile://private-photo.png');
+  await assert.rejects(harness.api.downloadPhoto('https://attacker.invalid/photo.png'), /无效/);
+  assert.equal(harness.calls.downloads.length, 1);
+});
+
+test('saved contact information is isolated by the verified account', async () => {
+  const harness = apiHarness();
+  harness.storage.set('yuexiang_profile', { name: 'Previous reader', phone: '13800138000', card: 'OLD' });
+  harness.storage.set('yuexiang_profile_owner', 'previous-account');
+  const ui = loadModule('miniprogram/utils/ui.js', { './api': harness.api }, harness);
+  assert.equal(ui.profile().phone, '');
+  await nativeLogin(harness, 'new-account');
+  assert.equal(ui.profile().phone, '');
+  ui.saveProfile({ name: 'New reader', phone: '13900139000', card: '' });
+  assert.equal(ui.profile().phone, '13900139000');
+  const pending = harness.api.logout();
+  harness.calls.requests.at(-1).success(response({}));
+  await pending;
+  assert.equal(ui.profile().phone, '');
+});
+
+test('door code is requested only for the current reservation and cleared on leaving', async () => {
+  const { page, requests } = pageHarness('mine', () => ({ available: true, password: '123456#', expiresAt: new Date(Date.now() + 3600000).toISOString() }));
+  page.setData({ user: { id: 'reader-A' }, kind: 'rooms', records: [{ id: 'room/id', date: '2026-11-08', timeSlot: '10:00' }] });
+  await page.showAccess({ currentTarget: { dataset: { id: 'room/id' } } });
+  assert.equal(requests[0].endpoint, '/api/room/bookings/room%2Fid/access');
+  assert.equal(page.data.access.password, '123456#');
+  page.onHide();
+  assert.equal(page.data.access, null);
+  page.setData({ access: { password: '123456#', expiresAt: new Date(Date.now() - 1000).toISOString() } });
+  page.expireAccess();
+  assert.equal(page.data.access, null);
+});
+test('door code late response is discarded after navigating away', async () => {
+  const pending = deferred();
+  const { page } = pageHarness('mine', () => pending.promise);
+  page.setData({ user: { id: 'reader-A' }, records: [{ id: 'room' }] });
+  const operation = page.showAccess({ currentTarget: { dataset: { id: 'room' } } });
+  page.onHide();
+  pending.resolve({ available: true, password: '123456', expiresAt: new Date(Date.now()+3600000).toISOString() });
+  await operation;
+  assert.equal(page.data.access, null);
+});
+test('administrator can save and remove a reservation code with explicit confirmation', async () => {
+  const { page, requests } = pageHarness('admin', call => call.method === 'GET' ? { configured: true, editable: true } : { configured: call.method === 'PUT' });
+  page.setData({ me: { username: 'admin' }, items: [{ id: 'room', code: 'TEST' }] });
+  await page.openDoor({ currentTarget: { dataset: { id: 'room' } } });
+  assert.equal(page.data.door.password, '');
+  page.setData({ 'door.password': '123456#' });
+  await page.saveDoor();
+  assert.equal(requests[1].method, 'PUT');
+  assert.deepEqual(requests[1].data, { password: '123456#' });
+  assert.equal(page.data.door, null);
+  await page.openDoor({ currentTarget: { dataset: { id: 'room' } } });
+  await page.removeDoor();
+  assert.equal(requests.at(-1).method, 'DELETE');
+  assert.equal(page.data.door, null);
+});
+test('phone search is an optional filter after verified login', async () => {
+  const { page, requests } = pageHarness('mine', () => []);
+  page.syncUser();
+  page.setData({ phone: '13800138000' });
+  await page.load();
+  assert.equal(requests[0].data.phone, '13800138000');
+  page.setData({ phone: '' });
+  await page.load();
+  assert.equal(requests[1].data.phone, undefined);
+  page.setData({ phone: 'bad' });
+  await page.load();
+  assert.equal(requests.length, 2);
+  assert.equal(page.data.records.length, 0);
 });

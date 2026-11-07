@@ -19,6 +19,7 @@ Page({
     return ui.run(this, async () => {
       const form = Object.assign({}, this.data.form, { name: this.data.form.name.trim(), phone: this.data.form.phone.trim() });
       ui.validateContact(form); ui.requireConsent(this.data.accepted);
+      await api.login();
       const record = await api.request('/api/borrows', 'POST', Object.assign({ bookId: this.bookId }, form));
       ui.saveProfile(form);
       await this.load();

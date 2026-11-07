@@ -1,22 +1,27 @@
-"""阅享空间 · Flask 本地服务端"""
+"""科育邻里 · Flask 本地服务端"""
 
 import os
 import uuid
+import secrets
+import identity
+import room_access
+from runtime_security import configure, require_member, bearer
 from functools import wraps
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 from PIL import Image, UnidentifiedImageError
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory, g
 import db
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'yuexiang-dev-secret-change-in-production')
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
+configure(app)
 
 UPLOAD_DIR = os.environ.get('LIBRARY_UPLOAD_DIR') or os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'volunteer')
 ALLOWED_IMAGE_EXT = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 
 db.init_db()
+if app.config['PRODUCTION'] and db.verify_admin('admin', 'admin123'):
+    raise RuntimeError('Default admin password must be changed before production startup')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -112,7 +117,15 @@ def garden_page():
 
 @app.route('/static/uploads/volunteer/<filename>')
 def volunteer_photo(filename):
-    return send_from_directory(UPLOAD_DIR, filename)
+    if not session.get('admin_id'):
+        member = identity.session_subject(bearer(), 'member')
+        if not member:
+            raise identity.LoginError('请先微信登录')
+        if not identity.photo_owned(filename, member):
+            raise identity.LoginError('照片不存在或不属于当前账户', 404)
+    response = send_from_directory(UPLOAD_DIR, filename)
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 @app.route('/admin/login')
@@ -145,16 +158,23 @@ def api_book(book_id):
     return jsonify(book)
 
 
-@app.route('/api/borrows', methods=['GET'])
-def api_list_borrows():
+def filter_own_records(records):
+    # Called only after an owner-scoped query; a phone number is never identity.
     phone = request.args.get('phone', '').strip()
+    if phone and (len(phone) != 11 or not phone.isascii() or not phone.isdigit()):
+        raise BadRequest('请输入正确的 11 位手机号，或留空查看全部本人记录')
+    return [record for record in records if record.get('phone') == phone] if phone else records
+
+
+@app.route('/api/borrows', methods=['GET'])
+@require_member()
+def api_list_borrows():
     tab = request.args.get('tab', 'active')
-    if phone and (len(phone) != 11 or not phone.isdigit()):
-        return jsonify({'error': '请输入正确的手机号'}), 400
-    return jsonify(db.list_borrows(phone, tab))
+    return jsonify(filter_own_records(db.list_borrows(owner_id=g.member_id, tab=tab)))
 
 
 @app.route('/api/borrows', methods=['POST'])
+@require_member()
 def api_create_borrow():
     data = _json_body()
     book_id = (data.get('bookId') or '').strip()
@@ -167,25 +187,25 @@ def api_create_borrow():
     if len(phone) != 11 or not phone.isdigit():
         return jsonify({'error': '请输入正确的手机号'}), 400
 
-    record, err = db.create_borrow(book_id, name, phone, card)
+    record, err = db.create_borrow(book_id, name, phone, card, owner_id=g.member_id)
     if err:
         return jsonify({'error': err}), 400
     return jsonify(record), 201
 
 
 @app.route('/api/borrows/<borrow_id>/return', methods=['POST'])
+@require_member('borrows', 'borrow_id')
 def api_return_borrow(borrow_id):
-    phone = (_json_body().get('phone') or '').strip()
-    record, err = db.return_borrow(borrow_id, phone=phone)
+    record, err = db.return_borrow(borrow_id)
     if err:
         return jsonify({'error': err}), 400
     return jsonify(record)
 
 
 @app.route('/api/borrows/<borrow_id>/renew', methods=['POST'])
+@require_member('borrows', 'borrow_id')
 def api_renew_borrow(borrow_id):
-    phone = (_json_body().get('phone') or '').strip()
-    record, err = db.renew_borrow(borrow_id, phone=phone)
+    record, err = db.renew_borrow(borrow_id)
     if err:
         return jsonify({'error': err}), 400
     return jsonify(record)
@@ -217,15 +237,14 @@ def api_room_stats():
 
 
 @app.route('/api/room/bookings', methods=['GET'])
+@require_member()
 def api_list_room_bookings():
-    phone = request.args.get('phone', '').strip()
     tab = request.args.get('tab', 'upcoming')
-    if phone and (len(phone) != 11 or not phone.isdigit()):
-        return jsonify({'error': '请输入正确的手机号'}), 400
-    return jsonify(db.list_room_bookings(phone, tab))
+    return jsonify(filter_own_records(db.list_room_bookings(owner_id=g.member_id, tab=tab)))
 
 
 @app.route('/api/room/bookings', methods=['POST'])
+@require_member()
 def api_create_room_booking():
     data = _json_body()
     date = (data.get('date') or '').strip()
@@ -242,7 +261,7 @@ def api_create_room_booking():
         return jsonify({'error': '请输入正确的手机号'}), 400
 
     record, err = db.create_room_booking(
-        date, time_slot, duration, purpose, name, phone, attendees,
+        date, time_slot, duration, purpose, name, phone, attendees, owner_id=g.member_id,
     )
     if err:
         return jsonify({'error': err}), 400
@@ -250,26 +269,21 @@ def api_create_room_booking():
 
 
 @app.route('/api/room/bookings/<booking_id>/checkout', methods=['POST'])
+@require_member('rooms', 'booking_id')
 def api_checkout_room_booking(booking_id):
     multipart = bool(request.content_type and 'multipart/form-data' in request.content_type)
-    data = request.form if multipart else _json_body()
+    if not multipart:
+        return jsonify({'error': '请通过文件上传提交本次志愿照片'}), 400
+    data = request.form
     volunteer_note = (data.get('volunteerNote') or '').strip()
-    phone = (data.get('phone') or '').strip()
+    phone = ''
     err = db.validate_room_checkout(booking_id, volunteer_note, phone)
     if err:
         return jsonify({'error': err}), 400
 
-    if multipart:
-        image_url, img_err = _save_volunteer_image(request.files.get('volunteerImage'))
-        if img_err:
-            return jsonify({'error': img_err}), 400
-    else:
-        image_url = (data.get('volunteerImage') or '').strip()
-        filename = os.path.basename(image_url)
-        expected_url = '/static/uploads/volunteer/' + filename
-        if (not filename or image_url != expected_url or
-                not os.path.isfile(os.path.join(UPLOAD_DIR, filename))):
-            return jsonify({'error': '请上传社区花园志愿服务照片'}), 400
+    image_url, img_err = _save_volunteer_image(request.files.get('volunteerImage'))
+    if img_err:
+        return jsonify({'error': img_err}), 400
 
     try:
         record, err = db.checkout_room_booking(
@@ -288,23 +302,18 @@ def api_checkout_room_booking(booking_id):
 
 
 @app.route('/api/room/bookings/<booking_id>/cancel', methods=['POST'])
+@require_member('rooms', 'booking_id')
 def api_cancel_room_booking(booking_id):
-    phone = (_json_body().get('phone') or '').strip()
-    record, err = db.cancel_room_booking(booking_id, phone=phone)
+    record, err = db.cancel_room_booking(booking_id)
     if err:
         return jsonify({'error': err}), 400
     return jsonify(record)
 
 
 @app.route('/api/user')
+@require_member()
 def api_get_user():
-    phone = request.args.get('phone', '').strip()
-    if len(phone) != 11 or not phone.isdigit():
-        return jsonify({'error': '请输入正确的手机号'}), 400
-    user = db.get_user(phone)
-    if not user:
-        return jsonify({'name': '', 'phone': phone, 'card': ''})
-    return jsonify(user)
+    return jsonify({'id': g.member_id})
 
 
 @app.route('/api/books/<book_id>/reviews')
@@ -316,28 +325,29 @@ def api_book_reviews(book_id):
 
 
 @app.route('/api/reviews/eligibility')
+@require_member()
 def api_review_eligibility():
     book_id = request.args.get('book_id', '').strip()
-    phone = request.args.get('phone', '').strip()
     if not book_id:
         return jsonify({'error': '缺少图书 ID'}), 400
-    result, err = db.get_review_eligibility(book_id, phone)
+    result, err = db.get_review_eligibility(book_id, g.member_id)
     if err:
         return jsonify({'error': err}), 404
     return jsonify(result)
 
 
 @app.route('/api/reviews/mine')
+@require_member()
 def api_my_reviews():
-    phone = request.args.get('phone', '').strip()
     book_id = request.args.get('book_id', '').strip()
-    result, err = db.list_my_reviews(phone, book_id)
+    result, err = db.list_my_reviews(g.member_id, book_id)
     if err:
         return jsonify({'error': err}), 400
-    return jsonify(result)
+    return jsonify(filter_own_records(result))
 
 
 @app.route('/api/reviews', methods=['POST'])
+@require_member()
 def api_create_review():
     data = _json_body()
     book_id = (data.get('bookId') or '').strip()
@@ -346,32 +356,30 @@ def api_create_review():
     rating = data.get('rating')
     content = (data.get('content') or '').strip()
 
-    record, err = db.create_review(book_id, phone, name, rating, content)
+    record, err = db.create_review(book_id, phone, name, rating, content, owner_id=g.member_id)
     if err:
         return jsonify({'error': err}), 400
     return jsonify(record), 201
 
 
 @app.route('/api/reviews/<review_id>', methods=['PUT'])
+@require_member('reviews', 'review_id')
 def api_update_review(review_id):
     data = _json_body()
     phone = (data.get('phone') or '').strip()
     rating = data.get('rating')
     content = data.get('content')
     name = data.get('name')
-    record, err = db.update_review(review_id, phone, rating=rating, content=content, name=name)
+    record, err = db.update_review(review_id, phone, rating=rating, content=content, name=name, owner_id=g.member_id)
     if err:
         return jsonify({'error': err}), 400
     return jsonify(record)
 
 
 @app.route('/api/reviews/<review_id>', methods=['DELETE'])
+@require_member('reviews', 'review_id')
 def api_delete_review(review_id):
-    data = _json_body()
-    phone = (data.get('phone') or request.args.get('phone') or '').strip()
-    if not phone:
-        return jsonify({'error': '缺少手机号'}), 400
-    ok, err = db.delete_review_by_user(review_id, phone)
+    ok, err = db.delete_review_by_user(review_id, g.member_id)
     if not ok:
         return jsonify({'error': err}), 400
     return jsonify({'ok': True})
@@ -387,14 +395,20 @@ def api_admin_login():
     admin = db.verify_admin(username, password)
     if not admin:
         return jsonify({'error': '用户名或密码错误'}), 401
+    identity.revoke(session.get('admin_session', ''))
+    session.clear()
+    session['admin_session'], expires = identity.issue_session('admin', admin['id'], lifetime=28800)
+    session['csrf_token'] = secrets.token_urlsafe(32)
+    session.permanent = True
     session['admin_id'] = admin['id']
     session['admin_username'] = admin['username']
     session['admin_name'] = admin['displayName']
-    return jsonify({'username': admin['username'], 'displayName': admin['displayName']})
+    return jsonify({'username': admin['username'], 'displayName': admin['displayName'], 'csrfToken': session['csrf_token']})
 
 
 @app.route('/api/admin/logout', methods=['POST'])
 def api_admin_logout():
+    identity.revoke(session.get('admin_session', ''))
     session.clear()
     return jsonify({'ok': True})
 
@@ -406,6 +420,7 @@ def api_admin_me():
     return jsonify({
         'username': session.get('admin_username'),
         'displayName': session.get('admin_name'),
+        'csrfToken': session.get('csrf_token'),
     })
 
 
@@ -560,13 +575,75 @@ def api_admin_delete_review(review_id):
     return jsonify({'ok': True})
 
 
+
+@app.route('/healthz')
+def health():
+    with db.get_db() as conn:
+        conn.execute('SELECT 1').fetchone()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/auth/wechat', methods=['POST'])
+def wechat_login():
+    if not request.is_json:
+        raise identity.LoginError('登录请求必须为 JSON', 415)
+    data = _json_body()
+    code = data.get('code')
+    if not isinstance(code, str) or not code.strip() or len(code) > 256:
+        raise identity.LoginError('请重新发起微信登录', 400)
+    appid, openid = identity.exchange_code(code)
+    member = identity.member_for_wechat(appid, openid)
+    token, expiry = identity.issue_session('member', member)
+    return jsonify({'token': token, 'expiresAt': expiry, 'user': {'id': member}})
+
+
+@app.route('/api/auth/me')
+@require_member()
+def auth_me():
+    return jsonify({'id': g.member_id})
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+@require_member()
+def auth_logout():
+    identity.revoke(bearer())
+    return jsonify({'ok': True})
+
+
+@app.route('/api/admin/legacy-link', methods=['POST'])
+@admin_required
+def legacy_link():
+    data = _json_body()
+    for field in ('kind', 'recordId', 'memberId', 'reason'):
+        if not isinstance(data.get(field), str):
+            raise identity.LoginError('绑定信息不完整', 400)
+    identity.link_legacy(data['kind'], data['recordId'], data['memberId'], data['reason'], session['admin_id'])
+    return jsonify({'ok': True})
+
+
+
+@app.route('/api/room/bookings/<booking_id>/access')
+@require_member('rooms', 'booking_id')
+def resident_room_access(booking_id):
+    return jsonify(room_access.resident_code(booking_id, g.member_id))
+
+
+@app.route('/api/admin/room/bookings/<booking_id>/access', methods=['GET', 'PUT', 'DELETE'])
+@admin_required
+def admin_room_access(booking_id):
+    if request.method == 'PUT':
+        return jsonify(room_access.set_code(booking_id, _json_body().get('password'), session['admin_id']))
+    if request.method == 'DELETE':
+        return jsonify(room_access.remove_code(booking_id, session['admin_id']))
+    return jsonify(room_access.metadata(booking_id))
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_DEBUG', '1') == '1'
+    debug = not app.config['PRODUCTION'] and os.environ.get('FLASK_DEBUG', '0') == '1'
     print('=' * 50)
-    print('  阅享空间 · 本地服务已启动')
+    print('  科育邻里 · 本地服务已启动')
     print(f'  浏览器打开: http://127.0.0.1:{port}')
     print('  管理: /admin/login')
-    print('  账号: admin  密码: admin123')
     print('=' * 50)
-    app.run(debug=debug, host='0.0.0.0', port=port, use_reloader=False)
+    app.run(debug=debug, host='127.0.0.1', port=port, use_reloader=False)

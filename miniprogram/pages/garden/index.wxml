@@ -3,7 +3,7 @@
     <image wx:if="{{hero}}" class="hero-image" src="{{hero}}" mode="aspectFill" binderror="imageError" />
     <view class="hero-shade"></view>
     <view class="hero-content">
-      <view class="eyebrow">YUEXIANG · COMMUNITY GARDEN</view>
+      <view class="eyebrow">KEYU · COMMUNITY GARDEN</view>
       <view class="hero-title">一座由居民<text>共同创造</text>的花园</view>
       <view class="hero-lead">让自然、阅读与邻里交流，在这里发生。</view>
       <view class="actions"><button class="primary" bindtap="books">去借一本书</button><button bindtap="room">预约花园小屋</button></view>
@@ -34,5 +34,5 @@
     <view>从共议、清理、搭建、种植到共治，每一次浇水、除草、分享和陪伴，都会让这座共同的花园继续生长。</view>
     <view class="actions"><button class="primary" bindtap="room">预约活动室</button><button class="ghost" bindtap="books">走进图书馆</button></view>
   </view>
-  <view class="footer">阅享空间 · 花园小屋<view>周一至周日 08:00—20:00</view><view>图书借阅 · 活动预约 · 花园共建</view></view>
+  <view class="footer">科育邻里 · 花园小屋<view>周一至周日 08:00—20:00</view><view>图书借阅 · 活动预约 · 花园共建</view></view>
 </view>

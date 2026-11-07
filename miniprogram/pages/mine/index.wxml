@@ -2,10 +2,23 @@
   <view class="eyebrow">YOUR READING & GARDEN DAYS</view><view class="title">我的记录</view>
   <view class="muted">借阅、读后感与相聚时光，都在这里。</view>
   <view class="card section">
-    <view class="label">使用预约或借阅时填写的手机号查询</view>
-    <view class="query-row"><input value="{{phone}}" bindinput="phoneInput" bindconfirm="query" type="number" maxlength="11" disabled="{{busy}}" placeholder="11 位手机号" confirm-type="search" /><button class="primary" bindtap="query" disabled="{{busy || loading}}" loading="{{loading}}">查询记录</button></view>
-    <checkbox-group bindchange="consent"><label class="check"><checkbox value="yes" checked="{{accepted}}" disabled="{{busy}}" /><view>同意使用手机号查询记录，并在本机保存用于下次填写。</view></label></checkbox-group>
+    <block wx:if="{{!user}}">
+      <view class="subtitle">微信登录，查看我的记录</view>
+      <view class="muted">借阅、预约和读后感只向所属微信账户展示。</view>
+      <checkbox-group bindchange="consent"><label class="check"><checkbox value="yes" checked="{{accepted}}" disabled="{{busy}}" /><view>已阅读隐私说明，同意使用微信身份识别我的服务记录。</view></label></checkbox-group>
+      <button class="primary" bindtap="login" disabled="{{busy}}" loading="{{busy}}">微信登录</button>
+    </block>
+    <block wx:else>
+      <view class="row"><view class="subtitle">已登录</view><button class="small ghost" bindtap="logout" disabled="{{busy}}">退出登录</button></view>
+      <view class="hint">账户编号（核验旧记录时向管理员出示）</view><text class="code" selectable>{{user.id}}</text>
+      <view class="hint">以前的手机号记录需到馆核验并绑定，无法通过输入手机号认领。</view>
+    </block>
     <view class="hint"><text class="link" bindtap="privacy">阅读隐私说明</text></view>
+  </view>
+  <view wx:if="{{user}}" class="card section">
+    <view class="label">按手机号查本人记录</view>
+    <view class="query-row"><input value="{{phone}}" bindinput="phoneInput" type="number" maxlength="11" placeholder="留空查看全部本人记录" bindconfirm="load" disabled="{{busy}}" /><button class="primary" bindtap="load" disabled="{{busy || loading}}">查询</button></view>
+    <view class="hint">仅在当前微信账户已绑定的记录内查询。</view>
   </view>
   <view class="tabs">
     <button class="{{kind === 'borrows' ? 'active' : ''}}" data-kind="borrows" bindtap="kindTap" disabled="{{busy}}">图书借阅</button>
@@ -16,10 +29,16 @@
     <button class="{{period === 'active' ? 'active' : ''}}" data-period="active" bindtap="periodTap" disabled="{{busy}}">{{kind === 'borrows' ? '借阅中' : '当前预约'}}</button>
     <button class="{{period === 'history' ? 'active' : ''}}" data-period="history" bindtap="periodTap" disabled="{{busy}}">历史记录</button>
   </view>
-  <view wx:if="{{!queried}}" class="empty">填写手机号并查询，查看你的记录。</view>
+  <view wx:if="{{!queried}}" class="empty">微信登录后即可查看你的记录。</view>
   <view wx:elif="{{loading}}" class="notice">正在查询记录…</view>
   <view wx:elif="{{error}}" class="notice error">{{error}}<button class="small ghost" bindtap="load">重新加载</button></view>
   <view wx:elif="{{!records.length}}" class="empty">这里还没有记录。</view>
+  <view wx:if="{{access}}" id="doorAccess" class="card section">
+    <view class="row"><view class="subtitle">活动室门锁密码</view><button class="small ghost" bindtap="closeAccess">隐藏</button></view>
+    <view class="muted">{{access.date}} {{access.timeSlot}} 的预约</view>
+    <text class="door-code" selectable>{{access.password}}</text>
+    <view class="hint">仅供本次预约使用，请按预约时段进入。预约结束后密码将隐藏，请勿转发。</view>
+  </view>
   <view class="grid">
     <view wx:for="{{records}}" wx:key="id" class="card record">
       <view class="row"><text class="badge {{item.overdue ? 'overdue' : ''}}">{{item.statusLabel}}</text><text wx:if="{{item.code}}" class="code">{{item.code}}</text></view>
@@ -41,8 +60,9 @@
         <view wx:if="{{item.status === 'upcoming' && !item.canCheckout}}" class="hint">活动开始后可提交志愿服务材料签退。</view>
         <view wx:if="{{item.canCheckout}}" class="hint">待提交志愿服务材料完成签退。</view>
         <view wx:if="{{item.volunteerNote}}" class="notice body-text">{{item.volunteerNote}}</view>
-        <image wx:if="{{item.imageUrl}}" class="record-photo photo" src="{{item.imageUrl}}" mode="aspectFill" data-url="{{item.imageUrl}}" bindtap="preview" lazy-load />
+        <button wx:if="{{item.volunteerImage}}" class="small ghost" data-path="{{item.volunteerImage}}" bindtap="preview" disabled="{{busy}}">查看志愿照片</button>
         <view class="actions">
+          <button wx:if="{{item.canAccess}}" class="small primary" data-id="{{item.id}}" bindtap="showAccess" disabled="{{busy || loading}}">查看门锁密码</button>
           <button wx:if="{{item.canCheckout}}" class="small primary" data-id="{{item.id}}" bindtap="checkout" disabled="{{busy || loading}}">提交材料 / 签退</button>
           <button wx:if="{{item.canCancel}}" class="small danger" data-id="{{item.id}}" data-action="cancel" bindtap="action" disabled="{{busy || loading}}">取消预约</button>
         </view>

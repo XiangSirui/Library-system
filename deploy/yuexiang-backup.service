@@ -1,0 +1,10 @@
+[Unit]
+Description=Consistent Keyu Neighborhood database and photo backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/yuexiang/deploy
+ExecStart=/usr/bin/docker compose --profile maintenance run --rm -T backup
+UMask=0077

@@ -1,6 +1,6 @@
 module.exports = [
   { id: 'about', eyebrow: 'ABOUT THE GARDEN', title: '花园小屋，不只是一处空间', description: '它将社区图书馆、户外课堂、生态体验和邻里活动连接在一起，既是居民休息阅读的庭院，也是大家共同维护、共同成长的社区客厅。社区共建、自然教育、邻里交流与持续共治，是我们共同的愿望。', photos: [
-    { path: '/static/images/garden/build/figure20.jpg', caption: '绿意中的阅享空间社区花园' },
+    { path: '/static/images/garden/build/figure20.jpg', caption: '绿意中的科育邻里社区花园' },
     { path: '/static/images/garden/build/figure22.jpg', caption: '居民在花园中交流与观察植物' }
   ] },
   { id: 'seasons', eyebrow: 'FOUR SEASONS', title: '同一座花园，不同的四季表情', description: '盛夏的树影、秋日的花木和冬日的积雪，共同记录着空间在时间里的变化。', photos: [

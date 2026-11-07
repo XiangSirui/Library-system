@@ -14,6 +14,7 @@ import warnings
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import db
+from storage_lock import StorageLock
 from werkzeug.security import generate_password_hash
 
 
@@ -50,7 +51,7 @@ def main(argv=None):
 
         password_hash = generate_password_hash(password)
         del password, confirmation
-        with db.get_db() as conn:
+        with StorageLock(), db.get_db() as conn:
             cursor = conn.execute(
                 'UPDATE admins SET password_hash = ? WHERE id = ? AND username = ?',
                 (password_hash, row['id'], username),
@@ -58,7 +59,9 @@ def main(argv=None):
             if cursor.rowcount != 1:
                 print('管理员记录已变化，未修改密码，请重试。', file=sys.stderr)
                 return 2
-        print('管理员密码已更新。')
+            if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='auth_sessions'").fetchone():
+                conn.execute("DELETE FROM auth_sessions WHERE kind = 'admin' AND subject_id = ?", (str(row['id']),))
+        print('管理员密码已更新，原有管理员会话已失效。')
         return 0
     except (EOFError, getpass.GetPassWarning):
         print('当前终端不能安全读取密码，请在本机交互式终端运行。', file=sys.stderr)

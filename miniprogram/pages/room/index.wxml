@@ -14,6 +14,7 @@
   <view class="split section">
     <view class="card">
       <view class="subtitle">选择日期与时段</view>
+      <view wx:if="{{error}}" class="empty">暂时无法获取日历，请恢复服务连接后点击上方“重新加载”。</view>
       <view class="date-grid">
         <button wx:for="{{days}}" wx:key="date" class="date-button {{date === item.date ? 'selected' : ''}}" data-date="{{item.date}}" bindtap="dateTap" disabled="{{busy}}">
           <view class="day-week">{{item.isToday ? '今天' : item.weekday}}</view><view class="day-date">{{item.displayMonth}} / {{item.displayDay}}</view><view class="day-count">{{item.freeSlots > 0 ? item.freeSlots + ' 个空闲' : '暂无空闲'}}</view>

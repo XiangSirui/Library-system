@@ -14,7 +14,7 @@ const FILTERS = {
 const STAT_LABELS = [
   ['totalBooks', '馆藏种类'], ['totalCopies', '馆藏册数'], ['availableCopies', '可借册数'],
   ['activeBorrows', '正在借阅'], ['overdueBorrows', '逾期借阅'], ['returnedTotal', '累计归还'],
-  ['readerCount', '读者人数'], ['roomToday', '今日活动室预约'], ['roomUpcoming', '待使用 / 待签退'],
+  ['readerCount', '微信账户数'], ['roomToday', '今日活动室预约'], ['roomUpcoming', '待使用 / 待签退'],
   ['pendingReviews', '待审核书评'], ['approvedReviews', '已发布书评']
 ];
 const SLOT_LABELS = { free: '可预约', booked: '已占用', closed: '未开放', past: '已过时' };
@@ -37,7 +37,7 @@ Page({
     search: '', status: 'all', filters: [], items: [], stats: [], popularBooks: [],
     rejectId: '', rejectReason: '', slotDays: [], selectedDate: '', openSlots: [],
     slotOptions: [], daySlots: [], dayBookings: [], applyToRange: false,
-    startDate: '', endDate: '', material: null
+    startDate: '', endDate: '', material: null, legacy: null, door: null
   },
   input: ui.formInput,
   preview: ui.preview,
@@ -54,7 +54,7 @@ Page({
   handleError(error) {
     if (error.status === 401) {
       this.sequence = (this.sequence || 0) + 1;
-      this.setData({ me: null, loading: false, items: [], stats: [], slotDays: [], material: null, error: '请登录管理员账号' });
+      this.setData({ me: null, loading: false, items: [], stats: [], slotDays: [], material: null, legacy: null, door: null, error: '请登录管理员账号' });
     } else { this.setData({ error: error.message || '加载失败，请重试' }); }
   },
   login() {
@@ -71,7 +71,7 @@ Page({
       finally {
         api.clearSession();
         this.sequence = (this.sequence || 0) + 1;
-        this.setData({ me: null, items: [], stats: [], popularBooks: [], slotDays: [], dayBookings: [], material: null, rejectId: '', 'form.password': '', error: '' });
+        this.setData({ me: null, items: [], stats: [], popularBooks: [], slotDays: [], dayBookings: [], material: null, legacy: null, door: null, rejectId: '', 'form.password': '', error: '' });
       }
     });
   },
@@ -79,7 +79,7 @@ Page({
     if (this.data.busy) return;
     const panel = event.currentTarget.dataset.value;
     if (!PANELS.some(item => item.value === panel)) return;
-    this.setData({ panel, status: panel === 'reviews' ? 'pending' : 'all', filters: FILTERS[panel] || [], search: '', items: [], error: '', material: null, rejectId: '' });
+    this.setData({ panel, status: panel === 'reviews' ? 'pending' : 'all', filters: FILTERS[panel] || [], search: '', items: [], error: '', material: null, legacy: null, door: null, rejectId: '' });
     this.load();
   },
   searchInput(event) { this.setData({ search: event.detail.value }); },
@@ -174,8 +174,64 @@ Page({
     });
   },
   openMaterial(event) {
-    const item = this.data.items.find(record => record.id === event.currentTarget.dataset.id);
-    if (item) this.setData({ material: Object.assign({}, item, { imageUrl: api.asset(item.volunteerImage) }) });
+    return ui.run(this, async () => {
+      const item = this.data.items.find(record => record.id === event.currentTarget.dataset.id);
+      if (!item) return;
+      const imageUrl = item.volunteerImage ? await api.downloadPhoto(item.volunteerImage, true) : '';
+      this.setData({ material: Object.assign({}, item, { imageUrl }) });
+    });
+  },
+  onHide() { this.doorSequence = (this.doorSequence || 0) + 1; this.setData({ door: null }); },
+  onUnload() { this.onHide(); },
+  openDoor(event) {
+    return ui.run(this, async () => {
+      const sequence = this.doorSequence = (this.doorSequence || 0) + 1;
+      const id = event.currentTarget.dataset.id;
+      const record = this.data.items.find(item => item.id === id);
+      if (!record) return;
+      const result = await api.request('/api/admin/room/bookings/' + encodeURIComponent(id) + '/access');
+      if (sequence !== this.doorSequence) return;
+      this.setData({ door: { id, code: record.code, password: '', configured: result.configured, editable: result.editable } }, () => wx.pageScrollTo({ selector: '#doorEditor', duration: 200 }));
+    });
+  },
+  doorInput(event) { this.setData({ 'door.password': event.detail.value }); },
+  closeDoor() { if (!this.data.busy) this.setData({ door: null }); },
+  saveDoor() {
+    return ui.run(this, async () => {
+      const door = this.data.door;
+      if (!door || !/^[0-9A-Za-z*#]{4,32}$/.test(door.password)) throw new Error('请输入 4 至 32 位数字、字母、* 或 #');
+      if (!(await ui.confirm('确认实体门锁已设置相同密码？保存后该预约居民即可查看。'))) return;
+      await api.request('/api/admin/room/bookings/' + encodeURIComponent(door.id) + '/access', 'PUT', { password: door.password });
+      this.setData({ door: null });
+      ui.success('门锁密码已保存');
+    });
+  },
+  removeDoor() {
+    return ui.run(this, async () => {
+      const door = this.data.door;
+      if (!door || !(await ui.confirm('移除后居民将无法在预约记录中查看密码。实体门锁密码需另行更换，确认移除？'))) return;
+      await api.request('/api/admin/room/bookings/' + encodeURIComponent(door.id) + '/access', 'DELETE');
+      this.setData({ door: null });
+      ui.success('门锁密码已移除');
+    });
+  },
+  openLegacy(event) {
+    if (this.data.busy) return;
+    this.setData({ legacy: { kind: this.data.panel, recordId: event.currentTarget.dataset.id, memberId: '', reason: '' } });
+  },
+  closeLegacy() { if (!this.data.busy) this.setData({ legacy: null }); },
+  legacyInput(event) { this.setData({ ['legacy.' + event.currentTarget.dataset.field]: event.detail.value }); },
+  linkLegacy() {
+    return ui.run(this, async () => {
+      const value = this.data.legacy;
+      if (!value || !/^[a-f0-9]{32}$/.test(value.memberId.trim())) throw new Error('请填写读者登录后展示的账户编号');
+      if (value.reason.trim().length < 5) throw new Error('请填写至少 5 字的身份核验说明');
+      if (!(await ui.confirm('确认已到馆核验该记录所属读者，并将记录绑定到此微信账户？'))) return;
+      await api.request('/api/admin/legacy-link', 'POST', Object.assign({}, value, { memberId: value.memberId.trim() }));
+      this.setData({ legacy: null });
+      await this.load();
+      ui.success('记录已绑定');
+    });
   },
   closeMaterial() { this.setData({ material: null }); }
 });

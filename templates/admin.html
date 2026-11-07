@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>管理后台 · 阅享空间</title>
+  <title>管理后台 · 科育邻里</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
     <div class="sidebar-brand">
       <span>📚</span>
       <div>
-        <strong>阅享空间</strong>
+        <strong>科育邻里</strong>
         <small>管理后台</small>
       </div>
     </div>
@@ -203,6 +203,19 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="doorModal">
+    <div class="modal admin-modal">
+      <button class="modal-close" data-close="doorModal">×</button>
+      <h2>设置活动室门锁密码</h2>
+      <p id="doorBookingLabel"></p>
+      <p>请先在实体门锁设置相同密码；这里不会远程修改门锁。保存后该预约居民即可查看，预约结束、取消或签退后隐藏。</p>
+      <p id="doorState"></p>
+      <form id="doorForm" class="admin-form">
+        <div class="form-group"><label for="doorPassword">新门锁密码</label><input id="doorPassword" type="password" maxlength="32" pattern="[0-9A-Za-z*#]{4,32}" autocomplete="new-password" placeholder="4–32 位数字、字母、* 或 #" required></div>
+        <div class="form-actions"><button id="doorSave" type="submit" class="btn btn-primary">保存密码</button><button id="doorRemove" type="button" class="btn btn-danger">移除密码</button><button type="button" class="btn btn-outline" data-close="doorModal">取消</button></div>
+      </form>
+    </div>
+  </div>
   <!-- 图书编辑弹窗 -->
   <div class="modal-overlay" id="bookModal">
     <div class="modal admin-modal">

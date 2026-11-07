@@ -1,0 +1,62 @@
+name: yuexiang
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: yuexiang-library:local
+    env_file: app.env
+    environment:
+      LIBRARY_ENV: production
+      LIBRARY_DB_PATH: ${LIBRARY_DB_PATH:-/data/library.db}
+      LIBRARY_UPLOAD_DIR: ${LIBRARY_UPLOAD_DIR:-/data/uploads}
+      TZ: Asia/Shanghai
+      TRUST_PROXY: "1"
+    volumes:
+      - data:/data
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  proxy:
+    image: caddy:2
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?Set SITE_DOMAIN in deploy/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+  backup:
+    image: yuexiang-library:local
+    profiles: ["maintenance"]
+    environment:
+      LIBRARY_DB_PATH: ${LIBRARY_DB_PATH:-/data/library.db}
+      LIBRARY_UPLOAD_DIR: ${LIBRARY_UPLOAD_DIR:-/data/uploads}
+    volumes:
+      - data:/data
+      - backups:/backups
+    command: ["python", "scripts/backup_restore.py", "backup", "--output", "/backups"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  data:
+  backups:
+  caddy_data:
+  caddy_config:

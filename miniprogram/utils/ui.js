@@ -1,3 +1,4 @@
+const api = require('./api');
 function errorMessage(error) { wx.showToast({ title: error.message || '操作失败，请重试', icon: 'none', duration: 3000 }); }
 async function run(page, action) {
   if (page.data.busy) return;
@@ -9,8 +10,8 @@ function confirm(content, title = '请确认') {
   return new Promise(resolve => wx.showModal({ title, content, confirmColor: '#315e46', success: result => resolve(result.confirm), fail: () => resolve(false) }));
 }
 function success(title) { wx.showToast({ title, icon: 'success' }); }
-function profile() { return wx.getStorageSync('yuexiang_profile') || { name: '', phone: '', card: '' }; }
-function saveProfile(value) { wx.setStorageSync('yuexiang_profile', { name: value.name || '', phone: value.phone || '', card: value.card || '' }); }
+function profile() { const user = api.user(); return user && wx.getStorageSync('yuexiang_profile_owner') === user.id ? wx.getStorageSync('yuexiang_profile') || { name: '', phone: '', card: '' } : { name: '', phone: '', card: '' }; }
+function saveProfile(value) { const user = api.user(); if (!user) return; wx.setStorageSync('yuexiang_profile_owner', user.id); wx.setStorageSync('yuexiang_profile', { name: value.name || '', phone: value.phone || '', card: value.card || '' }); }
 function validateContact(value) {
   if (!String(value.name || '').trim()) throw new Error('请填写姓名');
   if (!/^\d{11}$/.test(String(value.phone || ''))) throw new Error('请输入 11 位手机号');

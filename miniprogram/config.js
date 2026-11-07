@@ -14,6 +14,12 @@ function baseUrl() {
   const url = String(environments[env] || '').replace(/\/+$/, '');
   if (!url) throw new Error('服务尚未配置，请联系空间管理员');
   if (env !== 'develop' && !/^https:\/\//.test(url)) throw new Error('服务地址需要使用 HTTPS');
+  if (isLocal(url) && platform() && platform() !== 'devtools') throw new Error('真机无法访问电脑的本地服务，请在 config.js 中配置可访问的 HTTPS 测试域名');
   return url;
 }
-module.exports = { baseUrl, environment };
+function isLocal(url) { return /^http:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url); }
+function platform() {
+  try { return (wx.getDeviceInfo ? wx.getDeviceInfo() : wx.getSystemInfoSync()).platform || ''; }
+  catch (error) { return ''; }
+}
+module.exports = { baseUrl, environment, isLocal };

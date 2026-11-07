@@ -8,6 +8,12 @@ const me={username:'admin',displayName:'社区管理员'};
 const stats=[{key:'total',label:'馆藏种类',value:16},{key:'borrow',label:'正在借阅',value:8},{key:'return',label:'累计归还',value:32},{key:'pending',label:'待审核书评',value:3,attention:true}];
 const days=Array.from({length:15},(_,i)=>({...room,date:'2026-11-'+String(i+1).padStart(2,'0'),displayDay:i+1,openCount:8}));
 module.exports={
+ 'mine-login':{page:'mine',data:{}},
+ 'mine-door':{page:'mine',data:{user:{id:'0123456789abcdef0123456789abcdef'},kind:'rooms',queried:true,access:{password:'1234ABCD#*1234ABCD#*1234ABCD#*12',date:room.date,timeSlot:'10:00'}}},
+ 'admin-door':{page:'admin',data:{me,checking:false,panel:'rooms',door:{id:'demo',code:room.code,configured:true,editable:true,password:''}}},
+ 'admin-legacy':{page:'admin',data:{me,checking:false,panel:'borrows',legacy:{memberId:'',reason:''}}},
+ 'room-error':{page:'room',data:{error:'本地服务未启动，请运行开发服务后重试。'}},
+
  garden:{page:'garden',data:{sections:garden.map(s=>({...s,photos:s.photos.map(p=>({...p,url:p.path}))})),map:'/static/images/garden/garden-plan.jpg',hero:'/static/images/garden/build/figure20.jpg'}},
  books:{page:'books',data:{books:[book,{...book,id:'b2',title:'百年孤独',author:'加西亚·马尔克斯'},{...book,id:'b3',title:'三体',category:'科幻',author:'刘慈欣'},{...book,id:'b4',title:'人类简史',author:'尤瓦尔·赫拉利'},{...book,id:'b5',title:'小王子',author:'圣·埃克苏佩里'},longBook]}},
  'books-empty':{page:'books',data:{books:[],search:'未收录的书'}},
@@ -15,9 +21,9 @@ module.exports={
  book:{page:'book',data:{book,reviews:[review],reviewCount:1,avgRating:5}},
  'book-long':{page:'book',data:{book:longBook,reviews:[review],reviewCount:1,avgRating:5}},
  room:{page:'room',data:{days,slots:room.slots,date:room.date,weekday:room.weekday,timeSlot:'12:00',duration:1,endTime:'13:00'}},
- mine:{page:'mine',data:{queried:true,phone:'13800000000',queriedPhone:'13800000000',records:[{...book,bookId:'b1',bookTitle:'活着',code:'JY12345AB',status:'borrowed',statusLabel:'借阅中',borrowDate:'2026-10-30',dueDate:'2026-11-29'}]}},
- 'mine-rooms':{page:'mine',data:{queried:true,kind:'rooms',records:[{...room,status:'upcoming',statusLabel:'待使用 / 待签退',canCheckout:true}]}},
- 'mine-reviews':{page:'mine',data:{queried:true,kind:'reviews',records:[review]}},
+ mine:{page:'mine',data:{queried:true,user:{id:'0123456789abcdef0123456789abcdef'},phone:'13800000000',queriedPhone:'13800000000',records:[{...book,bookId:'b1',bookTitle:'活着',code:'JY12345AB',status:'borrowed',statusLabel:'借阅中',borrowDate:'2026-10-30',dueDate:'2026-11-29'}]}},
+ 'mine-rooms':{page:'mine',data:{queried:true,user:{id:'0123456789abcdef0123456789abcdef'},kind:'rooms',records:[{...room,status:'upcoming',statusLabel:'待使用 / 待签退',canCheckout:true,canAccess:true}]}},
+ 'mine-reviews':{page:'mine',data:{queried:true,user:{id:'0123456789abcdef0123456789abcdef'},kind:'reviews',records:[review]}},
  review:{page:'review',data:{book,form:{name:'测试读者',phone:'13800000000',content:'一本值得在社区读书分享会上推荐的书。',rating:5}}},
  checkout:{page:'checkout',data:{record:room}},
  privacy:{page:'privacy',data:{}},

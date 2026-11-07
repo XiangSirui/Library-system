@@ -8,10 +8,10 @@ Page({
     const version = retry ? '?v=' + Date.now() : '';
     const url = path => { const value = api.asset(path); return value ? value + version : ''; };
     const sections = content.map(section => Object.assign({}, section, { photos: section.photos.map(photo => Object.assign({}, photo, { url: url(photo.path) })) }));
-    this.setData({ sections, map: url('/static/images/garden/garden-plan.jpg'), hero: url('/static/images/garden/build/figure20.jpg'), error: api.asset('/') ? '' : '花园照片将在服务配置完成后显示' });
+    this.setData({ sections, map: url('/static/images/garden/garden-plan.jpg'), hero: url('/static/images/garden/build/figure20.jpg'), error: api.asset('/') ? '' : api.connectionError().message });
   },
   retryPhotos() { this.loadPhotos(true); },
-  imageError() { if (!this.data.error) this.setData({ error: '部分照片暂时无法加载，请检查网络后重试' }); },
+  imageError(event) { if (!this.data.error) this.setData({ error: api.connectionError(event && event.detail, '照片加载失败').message }); },
   preview(event) {
     const url = event.currentTarget.dataset.url;
     if (!url) return;
@@ -21,5 +21,5 @@ Page({
   scroll(event) { wx.pageScrollTo({ selector: '#' + event.currentTarget.dataset.target, duration: 300 }); },
   books() { wx.switchTab({ url: '/pages/books/index' }); },
   room() { wx.switchTab({ url: '/pages/room/index' }); },
-  onShareAppMessage() { return { title: '阅享空间 · 一座由居民共同创造的花园', path: '/pages/garden/index' }; }
+  onShareAppMessage() { return { title: '科育邻里 · 一座由居民共同创造的花园', path: '/pages/garden/index' }; }
 });

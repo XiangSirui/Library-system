@@ -46,7 +46,10 @@ Page({
       this.setData({ days });
       this.selectDay(day, true);
     } catch (error) {
-      if (sequence === this.sequence) this.setData({ error: error.message, days: [], slots: [], timeSlot: '', duration: 0 });
+      if (sequence === this.sequence) {
+        this.setData({ error: error.message, days: [] });
+        this.selectDay(null, false);
+      }
     } finally {
       if (sequence === this.sequence) this.setData({ loading: false });
     }
@@ -102,6 +105,7 @@ Page({
       };
       ui.validateContact(value);
       ui.requireConsent(this.data.accepted);
+      await api.login();
       if (!value.purpose) throw new Error('请填写活动用途');
       if (!Number.isInteger(value.attendees) || value.attendees < 1 || value.attendees > 30) throw new Error('预计人数须为 1–30 人');
       if (!value.date || !value.timeSlot || !value.duration) throw new Error('请选择可预约时段');
@@ -123,5 +127,5 @@ Page({
     });
   },
   records() { wx.switchTab({ url: '/pages/mine/index' }); },
-  onShareAppMessage() { return { title: '阅享空间 · 预约社区共享活动室', path: '/pages/room/index' }; }
+  onShareAppMessage() { return { title: '科育邻里 · 预约社区共享活动室', path: '/pages/room/index' }; }
 });

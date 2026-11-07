@@ -51,15 +51,15 @@ function fileSize(path) {
 }
 Page({
   data: {
-    id: '', phone: '', record: null, loading: false, busy: false, choosing: false,
+    id: '', record: null, loading: false, busy: false, choosing: false,
     error: '', imagePath: '', imageSize: '', form: { volunteerNote: '' }, accepted: false, completed: false
   },
   onLoad(options) {
-    this.setData({ id: options.id || '', phone: options.phone || ui.profile().phone || '' });
+    this.setData({ id: options.id || '' });
     this.load();
   },
   async load() {
-    if (!this.data.id || !/^\d{11}$/.test(this.data.phone)) {
+    if (!this.data.id) {
       this.setData({ error: '预约信息不完整，请从「我的记录」重新进入签退。' });
       return;
     }
@@ -67,12 +67,12 @@ Page({
     this.setData({ loading: true, error: '', record: null });
     try {
       const results = await Promise.all([
-        api.request('/api/room/bookings', 'GET', { phone: this.data.phone, tab: 'upcoming' }),
-        api.request('/api/room/bookings', 'GET', { phone: this.data.phone, tab: 'history' })
+        api.request('/api/room/bookings', 'GET', { tab: 'upcoming' }),
+        api.request('/api/room/bookings', 'GET', { tab: 'history' })
       ]);
       if (sequence !== this.sequence) return;
       const record = results[0].concat(results[1]).find(item => item.id === this.data.id);
-      if (!record) throw new Error('未找到此手机号的预约，请返回重新查询');
+      if (!record) throw new Error('未找到当前账户的预约，请返回重新登录');
       if (record.status === 'checked_out') { this.setData({ record, completed: true }); return; }
       if (record.status !== 'upcoming') throw new Error('该预约已取消，无法签退');
       if (Date.parse(record.date + 'T' + record.timeSlot + ':00+08:00') > Date.now()) throw new Error('活动开始后才可签退');
@@ -114,7 +114,7 @@ Page({
       if (volunteerNote.length < 5) throw new Error('志愿服务说明请至少填写 5 个字');
       if (!(await ui.confirm('确认提交照片与服务说明，并完成本次活动室签退？'))) return;
       await api.upload('/api/room/bookings/' + encodeURIComponent(this.data.id) + '/checkout', this.data.imagePath, {
-        phone: this.data.phone, volunteerNote
+        volunteerNote
       });
       this.setData({ completed: true, imagePath: '', imageSize: '', 'form.volunteerNote': '' });
       ui.success('签退完成');
